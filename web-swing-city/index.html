@@ -782,10 +782,11 @@
   var mirrorTimer = 0, bootStamp = parseInt(rawGet(STORAGE_STAMP), 10) || 0;
   function scheduleMirror() {   // called after every progress write: refresh the backup + IndexedDB copy soon
     if (mirrorTimer) return;
-    mirrorTimer = setTimeout(function () { mirrorTimer = 0; mirrorNow(); }, 600);
+    mirrorTimer = setTimeout(function () { mirrorTimer = 0; mirrorNow(); }, 2000);   // backup + IndexedDB at most every ~2 s
   }
-  function mirrorNow() {
-    if (storageState.locked) return;   // a restore/import is reloading the page: don't write old memory over it
+  function mirrorNow(force) {
+    if (storageState.locked) return;
+    if (!force && !storageState.dirty && idb.checked) return;   // nothing new to back up   // a restore/import is reloading the page: don't write old memory over it
     if (!idb.checked) { idb.pending = true; return; }   // wait until we know whether IndexedDB holds a newer copy
     rawSet(STORAGE_STAMP, String(Date.now()));
     var s = snapshot();
@@ -869,7 +870,7 @@
         var m = mergeSnapshots(fullSnapshot(), s);   // newer copy in IndexedDB: merge it in (never loses what's here)
         if (JSON.stringify(m.keys) !== JSON.stringify(fullSnapshot().keys)) { storageState.restored = 'indexeddb'; notice('Progress restored!'); applySnapshot(m, true); return; }
       }
-      if (!s || local > (s.t || 0) || idb.pending) mirrorNow();
+      if (!s || local > (s.t || 0) || idb.pending) mirrorNow(true);
     });
   }, 0);
   function flushProgress() { if (storageState.locked || storageState.loading) return; if (mirrorTimer) { clearTimeout(mirrorTimer); mirrorTimer = 0; } writeSave(); try { saveShop(); } catch (e) { /* not ready yet */ } mirrorNow(); }
@@ -1115,6 +1116,9 @@
   }
 
   function extendWorld(toX) {
+    // an Infinity / runaway x here used to be able to loop forever (a real freeze); never build more than ~6000 ahead per call
+    if (!isFinite(toX)) return;
+    toX = Math.min(toX, Math.min(world.nextBuildingX, world.nextAnchorX, world.nextHazardX != null ? world.nextHazardX : Infinity) + 6000);
     while (world.nextBuildingX < toX + 600) {
       var d = difficulty(world.nextBuildingX);
       var w = rand(130 - d * 20, 260 - d * 60);
@@ -2105,6 +2109,7 @@
   }
   function scheduleMusic() {
     if (!audio) return;
+    if (!(music.next > audio.currentTime - 0.3)) music.next = audio.currentTime + 0.05;   // fell behind (tab hidden / throttled timer): skip the missed notes instead of firing them all at once
     while (music.next < audio.currentTime + 0.2) {
       var T = MUSIC[music.track], stepDur = 60 / T.bpm / 4;
       var play = game.music && game.state !== 'paused' && audio.state === 'running';
@@ -2134,16 +2139,35 @@
       }
     } catch (e) { /* no speech on this device - bubbles still work */ }
   }
+  // Speech runs OUTSIDE the game frame (setTimeout), never more than one call per 1.2 s, and switches itself off for
+  // the session if the browser's speech engine stalls (desktop Chrome on macOS can block the page in cancel()+speak()).
+  var speech = { off: false, lastAt: 0, pending: null, slow: 0, startedAt: 0 };
   function speak(line, voice) {
-    if (!game.sound || !speechReady) return;
-    try {
-      var synth = window.speechSynthesis;
-      if (!synth || !window.SpeechSynthesisUtterance) return;
-      synth.cancel();
-      var u = new SpeechSynthesisUtterance(line);
-      u.pitch = (voice && voice.pitch) || 1; u.rate = (voice && voice.rate) || 1; u.volume = 0.9;
-      synth.speak(u);
-    } catch (e) { /* ignore */ }
+    if (!game.sound || !speechReady || speech.off) return;
+    speech.pending = { line: line, voice: voice };
+    if (speech.timer) return;
+    var wait = Math.max(0, 1200 - (performance.now() - speech.lastAt));
+    speech.timer = setTimeout(function () {
+      speech.timer = 0;
+      var q = speech.pending; speech.pending = null;
+      if (!q || speech.off || !game.sound) return;
+      var t0 = performance.now();
+      try {
+        var synth = window.speechSynthesis;
+        if (!synth || !window.SpeechSynthesisUtterance) return;
+        if (synth.speaking || synth.pending) {
+          if (speech.startedAt && t0 - speech.startedAt > 8000) { synth.cancel(); }   // stuck utterance: clear it
+          else synth.cancel();
+        }
+        var u = new SpeechSynthesisUtterance(q.line);
+        u.pitch = (q.voice && q.voice.pitch) || 1; u.rate = (q.voice && q.voice.rate) || 1; u.volume = 0.9;
+        u.onend = u.onerror = function () { speech.startedAt = 0; };
+        synth.speak(u); speech.startedAt = t0;
+      } catch (e) { speech.off = true; }
+      var took = performance.now() - t0;
+      speech.lastAt = performance.now();
+      if (took > 120) { speech.slow++; if (speech.slow >= 2) { speech.off = true; noteLoopError('speech', new Error('speech engine blocked the page for ' + Math.round(took) + ' ms; voice lines off for this session (speech bubbles still show)')); } }
+    }, wait);
   }
   // kind: start, swing, combo, stars, hit, boss, over.  important=true skips most of the cooldown.
   function say(kind, important) {
@@ -2208,9 +2232,20 @@
   }
   function setMusic(on) { game.music = on; store(STORAGE_MUSIC, on ? '1' : '0'); sfx('select'); }
   function pause(on) {
-    if (on && game.state === 'play') { game.state = 'paused'; release(); input.held = false; }
-    else if (!on && game.state === 'paused') { game.state = 'play'; last = performance.now(); }
+    if (on && game.state === 'play') { releaseAll(); game.state = 'paused'; game.pausedAt = performance.now(); }
+    else if (!on && game.state === 'paused') { releaseAll(); game.state = 'play'; last = performance.now(); }
   }
+  function releaseAll() {   // drop every held swing / charge (window lost focus, pointer left, capture lost...)
+    var had = Object.keys(input.roles).some(function (k) { return input.roles[k] === 'fire'; }) || input.charging;
+    input.roles = {};
+    try { canvas.releasePointerCapture && Object.keys(capturedPointers).forEach(function (id) { if (canvas.hasPointerCapture && canvas.hasPointerCapture(+id)) canvas.releasePointerCapture(+id); }); } catch (e) { /* ignore */ }
+    capturedPointers = {};
+    if (input.held || hero.rope) release();
+    input.held = false;
+    if (had) { try { releaseCharge(); } catch (e) { /* ignore */ } }
+  }
+  var capturedPointers = {};
+  function autoPause() { if (game.state === 'play') pause(true); else releaseAll(); }
 
   function press(px, py) {
     unlockAudio();
@@ -2235,6 +2270,7 @@
       if (tap && inRect(px, py, P.sound)) { setSound(!game.sound); return; }
       if (tap && inRect(px, py, P.music)) { setMusic(!game.music); return; }
       if (tap && inRect(px, py, P.quit)) { var wasStory = !!game.level; music.track = 'main'; toTitleScenery(); game.state = wasStory ? 'map' : 'title'; game.mapSel = -1; return; }
+      if (tap && !inRect(px, py, P.resume) && performance.now() - (game.focusAt || 0) < 500) return;   // the click that re-focused the window doesn't resume
       pause(false);
       return;
     }
@@ -2257,11 +2293,17 @@
   // Every finger gets a job: 'swing' (hold = web), 'fire' (web shooter) or 'ui' (buttons).
   canvas.addEventListener('pointerdown', function (e) {
     e.preventDefault();
+    if (e.pointerType === 'mouse') { try { canvas.setPointerCapture(e.pointerId); capturedPointers[e.pointerId] = 1; } catch (err) { /* ignore */ } }   // pointerup arrives even outside the window
     var x = e.clientX / UI, y = e.clientY / UI, id = e.pointerId;   // UI-layer coordinates (see beginUI)
     unlockAudio(); unlockSpeech();
     withUI(function () { pointerDown(e, x, y, id); });
   });
   function pointerDown(e, x, y, id) {
+    // ROOT CAUSE of the "frozen mid-swing" bug: a mouse button released outside the window never sent pointerup, so the
+    // swing stayed held; the next click reused the same pointerId, got treated as a "second finger" (fire) and the hero
+    // hung on the old web forever. A new press with a still-active id means we missed its release: end it first.
+    if (input.roles[id] !== undefined) pointerEnd({ pointerId: id, cancelable: false });
+    if (e.pointerType === 'mouse') Object.keys(input.roles).forEach(function (k) { if (+k !== id) pointerEnd({ pointerId: +k, cancelable: false }); });   // one mouse = one pointer
     if (game.state === 'title' && canFullscreen() && inRect(x, y, fullscreenButtonRect())) { input.roles[id] = 'ui'; toggleFullscreen(); return; }
     if (game.state === 'play') {
       if (game.tutorial) { input.roles[id] = 'ui'; dismissTutorial(); return; }
@@ -2282,7 +2324,8 @@
     press(x, y);
   }
   function pointerEnd(e) {
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
+    delete capturedPointers[e.pointerId];
     var role = input.roles[e.pointerId];
     delete input.roles[e.pointerId];
     if (role === 'swing' && swingFingers() === 0) release();
@@ -2290,6 +2333,15 @@
   }
   canvas.addEventListener('pointerup', pointerEnd);
   canvas.addEventListener('pointercancel', pointerEnd);
+  window.addEventListener('pointermove', function (e) {   // mouse moving with no button down but we think it's held = missed release
+    if (e.pointerType === 'mouse' && e.buttons === 0 && input.roles[e.pointerId] !== undefined) pointerEnd({ pointerId: e.pointerId, cancelable: false });
+  });
+  canvas.addEventListener('lostpointercapture', function (e) { if (input.roles[e.pointerId]) pointerEnd(e); });
+  window.addEventListener('pointerup', function (e) { if (e.target !== canvas && input.roles[e.pointerId]) pointerEnd(e); });   // released over something else
+  document.addEventListener('mouseleave', function () { if (!Object.keys(capturedPointers).length) releaseAll(); });   // left the window without capture
+  window.addEventListener('blur', autoPause);
+  window.addEventListener('pagehide', autoPause);
+  window.addEventListener('focus', function () { game.focusAt = performance.now(); });   // stay on the Pause screen; RESUME is the player's choice
   ['touchstart', 'touchmove', 'touchend'].forEach(function (t) {
     document.addEventListener(t, function (e) {
       if (maker.el && maker.el.contains(e.target)) return;   // Hero Maker needs normal taps, typing and scrolling
@@ -2327,7 +2379,7 @@
     if (e.code === 'KeyF' || e.code === 'KeyX') { releaseCharge(); return; }
     if (WEB_KEYS[e.code]) { e.preventDefault(); release(); }
   });
-  document.addEventListener('visibilitychange', function () { input.roles = {}; if (document.hidden) { release(); pause(true); } });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) autoPause(); else game.focusAt = performance.now(); });
 
   /* =====================================================================
    * 7. DRAWING
@@ -3214,15 +3266,16 @@
   /* ---------- pause screen ---------- */
   function pauseLayout() {
     var bw = Math.min(260, screenW * 0.7), bh = Math.max(46, Math.min(60, screenH * 0.1)), cx = (screenW - bw) / 2, y = screenH * 0.42;
-    var g = Math.min(14, screenH * 0.025); y = Math.min(y, screenH - safe.bottom - (bh + g) * 4);
-    return { resume: { x: cx, y: y, w: bw, h: bh }, sound: { x: cx, y: y + bh + g, w: bw, h: bh }, music: { x: cx, y: y + (bh + g) * 2, w: bw, h: bh }, quit: { x: cx, y: y + (bh + g) * 3, w: bw, h: bh } };
+    var g = Math.min(14, screenH * 0.025), rh = bh * 1.35; y = Math.min(y, screenH - safe.bottom - (bh + g) * 3 - rh - g);
+    var rw = Math.min(320, screenW * 0.8);
+    return { resume: { x: (screenW - rw) / 2, y: y - (rh - bh) - g * 0.5, w: rw, h: rh }, sound: { x: cx, y: y + bh + g, w: bw, h: bh }, music: { x: cx, y: y + (bh + g) * 2, w: bw, h: bh }, quit: { x: cx, y: y + (bh + g) * 3, w: bw, h: bh } };
   }
   function drawPause() {
     ctx.fillStyle = 'rgba(15,18,50,0.6)';
     ctx.fillRect(0, 0, screenW, screenH);
     var P = pauseLayout();
     text('PAUSED', screenW / 2, P.resume.y - Math.min(70, screenH * 0.12), Math.min(64, screenW / 8), '#ffd23f');
-    button(P.resume, 'KEEP SWINGING', '#3ddc84');
+    button(P.resume, '\u25B6  RESUME', '#3ddc84');
     button(P.sound, game.sound ? 'Sound: ON' : 'Sound: OFF', game.sound ? '#4f8bff' : '#8a92a6');
     button(P.music, game.music ? 'Music: ON' : 'Music: OFF', game.music ? '#4f8bff' : '#8a92a6');
     button(P.quit, 'Quit to menu', '#ff3b3b');
@@ -3365,7 +3418,7 @@
     if (game.state === 'title') drawFullscreenButton();
     drawSavedTick();
     endUI();
-    canvas.style.cursor = game.state === 'play' && !coarsePointer() ? 'none' : 'default';   // mouse: cursor on menus, hidden while swinging
+    // (round 9: the pointer is ALWAYS visible; hiding it while swinging made a stall look like a dead freeze)
   }
   function coarsePointer() { return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); }
   // ---- fullscreen (desktop / Android; iPhone Safari has no fullscreen API so the button hides there)
@@ -6486,28 +6539,63 @@
   storageState.loading = false;
   function progressSig() { try { return JSON.stringify([save, shop, bank, medals, game.best, game.character, game.sound, game.music]); } catch (e) { return ''; } }
   var lastSig = '';   // first tick writes anything start-up changed (e.g. migrated hero ids); the downgrade guard still applies
-  function autosave() {
+  var saveStats = { checks: 0, writes: 0, checkMs: 0, writeMs: 0, maxMs: 0 };   // autosave cost (WebSwingCity.saveStats())
+  function autosave() {   // runs every 2 s from a timer (never per frame); writes only when something changed
     if (storageState.loading || storageState.locked) return;
-    var sig = progressSig();
-    if (sig === lastSig) return;
-    lastSig = sig;
-    writeSave(); saveShop(); store(STORAGE_MEDALS, JSON.stringify(medals)); store(STORAGE_BEST, game.best); store(STORAGE_HERO, game.character);
-    store(STORAGE_SOUND, game.sound ? '1' : '0'); store(STORAGE_MUSIC, game.music ? '1' : '0');
-    scheduleMirror();
+    var t0 = performance.now();
+    try {
+      var sig = progressSig();
+      saveStats.checks++;
+      if (sig === lastSig) return;
+      lastSig = sig;
+      writeSave(); saveShop(); store(STORAGE_MEDALS, JSON.stringify(medals)); store(STORAGE_BEST, game.best); store(STORAGE_HERO, game.character);
+      store(STORAGE_SOUND, game.sound ? '1' : '0'); store(STORAGE_MUSIC, game.music ? '1' : '0');
+      scheduleMirror(); saveStats.writes++;
+    } catch (e) { noteLoopError('autosave', e); }
+    finally { var ms = performance.now() - t0; saveStats.checkMs += ms; if (ms > saveStats.maxMs) saveStats.maxMs = ms; }
   }
   setInterval(autosave, 2000);
   try { var nt = sessionStorage.getItem('webSwingCity.notice'); if (nt) { sessionStorage.removeItem('webSwingCity.notice'); game.shopMsg = { text: nt, life: 3 }; } } catch (e) { /* ignore */ }
 
   var last = performance.now();
+  var loopErrors = [], loopErrorSeen = {};   // shown with ?debug=1, and WebSwingCity.errors()
+  function noteLoopError(where, e) {
+    var msg = where + ': ' + (e && e.message || e), key = msg + (e && e.stack ? String(e.stack).split('\n')[1] : '');
+    perf.errors = (perf.errors || 0) + 1;
+    if (loopErrorSeen[key]) { loopErrorSeen[key].n++; return; }
+    var rec = { msg: msg, n: 1, t: Math.round(performance.now()), state: game.state, level: game.levelIndex };
+    loopErrorSeen[key] = rec; loopErrors.push(rec); if (loopErrors.length > 12) loopErrors.shift();
+    if (window.console) console.warn('[Web Swing City] ' + msg + '\n' + (e && e.stack || ''));
+  }
+  function finite(v) { return typeof v === 'number' && isFinite(v); }
+  function nanGuard() {   // a NaN hero/camera would look like a freeze: put the hero back somewhere safe
+    if (!(finite(hero.x) && finite(hero.y) && finite(hero.vx) && finite(hero.vy))) {
+      noteLoopError('nan-guard', new Error('hero position was not a number; reset'));
+      var bx = finite(hero.x) ? hero.x : (finite(cam.x) ? cam.x + viewW * 0.33 : 0), b = null;
+      for (var i = 0; i < world.buildings.length; i++) { var B = world.buildings[i]; if (B.x <= bx + 40 && B.x + B.w >= bx - 40) { b = B; break; } }
+      if (!b) b = world.buildings[0];
+      hero.x = b ? b.x + b.w * 0.5 : 0; hero.y = (b ? b.top : GROUND_Y) - TUNING.heroRadius - 120; hero.vx = TUNING.runSpeed; hero.vy = 0;
+      hero.rope = null; hero.zip = null; hero.flying = false; input.held = false;
+
+      if (hero.trail) hero.trail.length = 0;
+    }
+    if (!(finite(cam.x) && finite(cam.y))) { cam.x = hero.x - viewW * 0.33; cam.y = hero.y - viewH * 0.5; noteLoopError('nan-guard', new Error('camera was not a number; reset')); updateCamera(0, true); }
+    if (!finite(game.time)) game.time = 0;
+  }
   function frame(now) {
-    var dt = Math.min(0.05, (now - last) / 1000);
+    requestAnimationFrame(frame);   // ALWAYS keep the loop alive, even if this frame throws
+    var dt = Math.min(0.05, Math.max(0, (now - last) / 1000) || 0);
     perf.frameMs += ((now - last) - perf.frameMs) * 0.05;
-    last = now;
+    last = now; perf.frames = (perf.frames || 0) + 1;
     var w0 = performance.now();
-    update(dt);
-    render(game.time);
+    try { update(dt); } catch (e) { noteLoopError('update', e); try { endUI(); } catch (e2) { /* ignore */ } }
+    try { nanGuard(); } catch (e) { noteLoopError('nanGuard', e); }
+    try { render(game.time); } catch (e) {
+      noteLoopError('render', e);
+      try { endUI(); for (var r = 0; r < 64; r++) ctx.restore(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; } catch (e2) { /* ignore */ }   // undo half-finished drawing state
+    }
+    if (DEBUG && loopErrors.length) { try { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); loopErrors.slice(-5).forEach(function (r, i) { text(r.n + 'x ' + r.msg, 10, 60 + i * 16, 12, '#ff8a8a', 'left', '700'); }); } catch (e) { /* ignore */ } }
     perf.workMs += ((performance.now() - w0) - perf.workMs) * 0.05;
-    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
@@ -6533,7 +6621,9 @@
     titleLayout: apiLayout(titleLayout), shopLayout: apiLayout(shopLayout), pauseLayout: apiLayout(pauseLayout), pauseButtonRect: apiLayout(pauseButtonRect),
     perf: perf, shop: shop, fire: fireWeb, medals: medals, stats: function () { return game.stats; },
     fireButtonRect: apiLayout(fireButtonRect), overLayout: apiLayout(overLayout), medalsLayout: apiLayout(medalsLayout), view: function () { return { x: cam.x, y: cam.y, w: viewW, h: viewH }; }, talk: talk, zoneAt: zoneAt,
-    addStars: function (n) { bank += n; saveShop(); }, getBank: function () { return bank; },
+    addStars: function (n) { bank += n; saveShop(); }, getBank: function () { return bank; }, errors: function () { return loopErrors; }, speech: speech,
+    counts: function () { var c = { particles: particles.length, popups: popups.length, love: loveFx.list.length, rings: riff.rings.length, notes: riff.notes.length,
+      traps: spx.traps.length, waves: spx.waves.length, splats: spx.splats.length, trail: hero.trail.length }; for (var k in world) if (Array.isArray(world[k])) c['w.' + k] = world[k].length; return c; }, saveStats: function () { return saveStats; }, storageStats: function () { return storageState; }, releaseAll: releaseAll, pause: pause, input: input,
     ROSA: ROSA, loveFx: loveFx, cycleDifficulty: cycleDifficulty, diff: diffCfg, maxHearts: maxHearts, ghost: function () { return game.ghost; },
     ghostRec: function () { return game.ghostRec; }, loadGhost: loadGhost, coach: function () { return game.coach; }, buddy: function () { return world.buddies; }, scale: function () { return scale; }, ui: function () { return UI; },
     toggleFly: toggleFly, FLY: FLY, HEARTB: HEARTB, bossSkin: bossSkin, EXTRA_HEROES: EXTRA_HEROES,
