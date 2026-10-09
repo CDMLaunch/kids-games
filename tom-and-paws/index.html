@@ -272,6 +272,19 @@ body.touch.tablet .skincard{width:130px;min-height:120px}
 #scr-mouse .mouse-notes{font-size:14px;margin:8px auto 8px;max-width:640px}
 #scr-mouse #mouseLevelRow .btn{min-width:150px}
 @media (max-height:520px){ #scr-mouse figure{max-width:230px} #scr-mouse .mouse-notes{font-size:12px;margin:4px auto} #scr-mouse h2{font-size:20px!important} }
+/*SAVE-UX-BEGIN*/
+#savedTick{position:absolute;right:10px;bottom:10px;z-index:60;display:flex;align-items:center;gap:4px;background:rgba(255,248,232,.92);color:#2e8b57;border:2px solid rgba(59,46,74,.35);border-radius:999px;padding:3px 10px 3px 7px;font-weight:800;font-size:12px;pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .25s,transform .25s}
+#savedTick.show{opacity:1;transform:none}
+#scr-save .save-steps{text-align:left;font-size:13px;margin:4px auto 6px;padding-left:20px;max-width:440px}
+#scr-save .save-steps li{margin:2px 0}
+#scr-save .save-have{font-size:13px;font-weight:800;background:#fff3c4;border:2px solid rgba(59,46,74,.25);border-radius:12px;padding:4px 10px;margin:4px 0 6px;display:inline-block}
+#scr-save .save-note{font-size:11.5px;opacity:.8;margin:6px 0 10px}
+#scr-save .card{padding-top:14px;padding-bottom:0!important;scroll-padding-bottom:80px}
+#scr-save h2{margin:0}
+#scr-save textarea{height:46px!important}
+#scr-save .save-foot{position:sticky;bottom:0;z-index:3;background:var(--paper);padding:6px 0 8px;margin-bottom:0!important;border-top:2px dashed rgba(59,46,74,.16)}
+body.phone #scr-save .save-foot{bottom:-16px;padding-bottom:22px}
+/*SAVE-UX-END*/
 /*MOUSE-FIT-BEGIN: intro card fits; Back pinned at the bottom of the card (like the 2P lobby) */
 #scr-mouse .mouse-card{padding-bottom:0!important;scroll-padding-bottom:90px}
 #scr-mouse .mouse-foot{position:sticky;bottom:0;z-index:3;background:var(--paper);margin:6px -4px 0;padding:2px 4px 10px;border-top:2px dashed rgba(59,46,74,.16)}
@@ -770,15 +783,22 @@ body.phone .vx-foot{bottom:-16px;padding-bottom:22px}
   <div id="scr-save" class="screen panelbg hidden">
     <div class="card" style="max-width:520px">
       <h2 style="font-size:26px">Save Code</h2>
-      <p style="font-size:13px;margin:6px 0 4px">Your progress saves automatically — but copy this code to move it to another computer or keep it extra safe!</p>
+      <p style="font-size:13px;margin:6px 0 4px">Your progress saves automatically on this device. A save code lets you move it to another iPad or computer, or keep it extra safe!</p>
+      <div class="save-have" id="saveHave"></div>
+      <ol class="save-steps">
+        <li><b>On this device:</b> tap <b>Copy code</b> and keep it somewhere safe (a note or a message).</li>
+        <li><b>On the other device:</b> open <b>Save Code</b>, paste the code in the bottom box, tap <b>Load</b>.</li>
+        <li>Loading keeps the best of both, so it never wipes stars you already have.</li>
+      </ol>
       <textarea id="exportBox" readonly style="width:100%;height:64px;font-size:11px;border:3px solid var(--ink);border-radius:12px;padding:6px;font-family:monospace"></textarea>
       <div class="row" style="margin-top:6px"><button class="btn small" id="copySave">Copy code</button></div>
       <p style="font-size:13px;margin:12px 0 4px">Paste a code here to load progress:</p>
       <textarea id="importBox" style="width:100%;height:64px;font-size:11px;border:3px solid var(--ink);border-radius:12px;padding:6px;font-family:monospace"></textarea>
-      <div class="row" style="margin-top:8px">
+      <div class="row save-foot" style="margin-top:8px">
         <button class="btn small green" id="loadSaveBtn">Load</button>
         <button class="btn ghost small" id="saveBack">Back</button>
       </div>
+      <p class="save-note" id="saveNote">Good to know: the Home Screen icon and the Safari tab keep separate progress, and Private Browsing can't keep progress. Use a save code to move it between them.</p>
     </div>
   </div>
 
@@ -1033,45 +1053,108 @@ const MUSIC=(()=>{
   };
 })();
 
-/* ------ save data: window.storage if available, else RAM --- */
-const SAVE_KEY='tomPaws-save-v1';
-let save={coins:0, stars:{}, skins:{cat:['classic'],dog:['classic']}, skinCat:'classic', skinDog:'classic', gear:{shield:false,hole:false}, diff:'classic', totalScore:0, best:{}, up:{sprint:0,bark:0,sniff:0,heart:0,speed:0}, bestWave:0, stickers:{}, stickerPages:{}, daily:{day:'',cleared:false,kind:''}, endlessPrizes:{}, ctrlSize:'medium'};
-let storageOK=false;
-async function loadSave(){
-  let raw=null;
-  try{ if(window.storage){ const r=await window.storage.get(SAVE_KEY); if(r&&r.value)raw=r.value; storageOK=true; } }
-  catch(e){ storageOK = !!window.storage; /* key may not exist yet — that's fine */ }
-  if(!raw){ try{ raw=localStorage.getItem(SAVE_KEY); }catch(e){} }
-  if(raw){ try{ save=Object.assign(save,JSON.parse(raw)); }catch(e){} }
+/* ------ save data: localStorage first (loaded synchronously, before anything can save), window.storage if it is a real storage API --- */
+const SAVE_KEY='tomPaws-save-v1', SAVE_BAK=SAVE_KEY+'-bak';
+const SAVE_DEFAULTS=()=>({coins:0, stars:{}, skins:{cat:['classic'],dog:['classic']}, skinCat:'classic', skinDog:'classic', gear:{shield:false,hole:false}, diff:'classic', totalScore:0, best:{}, up:{sprint:0,bark:0,sniff:0,heart:0,speed:0}, bestWave:0, stickers:{}, stickerPages:{}, daily:{day:'',cleared:false,kind:''}, endlessPrizes:{}, ctrlSize:'medium'});
+let save=SAVE_DEFAULTS();
+let storageOK=false, saveReady=false, lsOK=true, saveLastJs='', saveStoredProg=0;
+/* a DOM element with id/name "storage" becomes window.storage by named access: only trust a real get/set API */
+function extStorage(){ try{ const s=window.storage; if(!s||typeof s.get!=='function'||typeof s.set!=='function') return null; if(typeof Element!=='undefined'&&s instanceof Element) return null; if(typeof HTMLCollection!=='undefined'&&s instanceof HTMLCollection) return null; return s; }catch(e){ return null; } }
+/* how much progress a save holds (coins are spendable, so they only break ties) */
+function saveProgress(s){ if(!s||typeof s!=='object') return 0; let n=0; const cnt=o=>o&&typeof o==='object'?Object.keys(o).filter(k=>o[k]).length:0;
+  for(const k in (s.stars||{})) n+=(+s.stars[k]||0)*10; n+=cnt(s.stickers)*10+cnt(s.stickerPages)*10+cnt(s.endlessPrizes)*10+cnt(s.best)*3;
+  if(s.skins) n+=((s.skins.cat||[]).length+(s.skins.dog||[]).length-2)*10; for(const k in (s.up||{})) n+=(+s.up[k]||0)*10; for(const k in (s.gear||{})) if(s.gear[k]) n+=10;
+  if(s.mouse&&s.mouse.stars) for(const k in s.mouse.stars) n+=(+s.mouse.stars[k]||0)*10; n+=(+s.bestWave||0)*2+Math.min(50,Math.floor((+s.totalScore||0)/200))+Math.min(9,Math.floor((+s.coins||0)/20));
+  return n; }
+function parseSave(raw){ if(!raw) return null; try{ const d=JSON.parse(raw); return (d&&typeof d==='object'&&typeof d.coins==='number')?d:null; }catch(e){ return null; } }
+/* fill in defaults without dropping anything nested */
+function normalizeSave(){
+  const D=SAVE_DEFAULTS();
+  for(const k in D) if(save[k]===undefined||save[k]===null) save[k]=D[k];
+  save.stars=save.stars||{}; save.skins=Object.assign({cat:['classic'],dog:['classic']},save.skins||{});
+  for(const w of ['cat','dog']){ if(!Array.isArray(save.skins[w])) save.skins[w]=['classic']; if(!save.skins[w].includes('classic')) save.skins[w].unshift('classic'); }
   save.gear=Object.assign({shield:false,hole:false},save.gear||{});
   save.best=save.best||{}; save.totalScore=save.totalScore||0;
   save.up=Object.assign({sprint:0,bark:0,sniff:0,heart:0,speed:0},save.up||{}); save.bestWave=save.bestWave||0;
   save.stickers=save.stickers||{}; save.stickerPages=save.stickerPages||{};
   save.daily=Object.assign({day:'',cleared:false,kind:''},save.daily||{});
   save.endlessPrizes=save.endlessPrizes||{};
+  if(save.mouse){ save.mouse=Object.assign({stars:{},played:0},save.mouse); save.mouse.stars=save.mouse.stars||{}; }
+  if(typeof save.coins!=='number'||!isFinite(save.coins)) save.coins=0;
   if(!['small','medium','large'].includes(save.ctrlSize)) save.ctrlSize='medium';
+}
+/* merge two saves keeping the best of both (used when loading a save code or a second storage) */
+function mergeSaves(base,inc){
+  const out=Object.assign({},base,inc), mx=(a,b)=>Math.max(+a||0,+b||0), num=o=>o&&typeof o==='object'?o:{};
+  const maxMap=(a,b)=>{ const r=Object.assign({},num(a)); for(const k in num(b)) r[k]=(typeof b[k]==='number'||typeof r[k]==='number')?mx(r[k],b[k]):b[k]; return r; };
+  const orMap=(a,b)=>{ const r=Object.assign({},num(a)); for(const k in num(b)) r[k]=r[k]||b[k]; return r; };
+  out.stars=maxMap(base.stars,inc.stars); out.best=maxMap(base.best,inc.best); out.up=maxMap(base.up,inc.up);
+  out.stickers=orMap(base.stickers,inc.stickers); out.stickerPages=orMap(base.stickerPages,inc.stickerPages); out.endlessPrizes=orMap(base.endlessPrizes,inc.endlessPrizes); out.gear=orMap(base.gear,inc.gear);
+  out.skins={}; for(const w of ['cat','dog']) out.skins[w]=[...new Set([...((base.skins||{})[w]||[]),...((inc.skins||{})[w]||[])])];
+  out.coins=mx(base.coins,inc.coins); out.totalScore=mx(base.totalScore,inc.totalScore); out.bestWave=mx(base.bestWave,inc.bestWave);
+  if(base.mouse||inc.mouse){ const a=base.mouse||{}, b=inc.mouse||{}; out.mouse=Object.assign({},a,b,{stars:maxMap(a.stars,b.stars),played:mx(a.played,b.played)}); }
+  const da=base.daily||{}, db=inc.daily||{}; out.daily=(String(db.day||'')>=String(da.day||''))?db:da;
+  return out;
+}
+function readLS(k){ try{ return localStorage.getItem(k); }catch(e){ lsOK=false; return null; } }
+/* step 1 - synchronous: runs right here while the script loads, so nothing can save defaults over real progress */
+function loadSaveSync(){
+  const main=parseSave(readLS(SAVE_KEY)), bak=parseSave(readLS(SAVE_BAK));
+  let pick=main; if(!main&&bak) pick=bak; else if(main&&bak&&saveProgress(bak)>saveProgress(main)) pick=bak;
+  if(pick) save=Object.assign(save,pick);
+  normalizeSave(); saveStoredProg=saveProgress(save); saveLastJs=pick?JSON.stringify(save):'';
+  try{ localStorage.setItem('tomPaws-probe','1'); localStorage.removeItem('tomPaws-probe'); }catch(e){ lsOK=false; }
+  saveReady=true;
+  try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
+}
+loadSaveSync();
+/* step 2 - after the page is set up: merge in window.storage (if it is a real API), apply settings */
+async function loadSave(){
+  const ext=extStorage();
+  if(ext){ try{ const r=await ext.get(SAVE_KEY); const d=parseSave(r&&r.value); storageOK=true; if(d&&saveProgress(d)>0){ save=mergeSaves(save,d); normalizeSave(); } }catch(e){ storageOK=true; /* key may not exist yet */ } }
   applyCtrlSize();
   refreshCoinChips();
+  if(!lsOK) setTimeout(()=>{ try{ toast('Progress can\u2019t be saved in Private Browsing. Use a Save Code to keep it.',5000); }catch(e){} },1200);
+}
+let saveTickT=0;
+function showSavedTick(){
+  try{ if(game&&game.state==='play') return; let el=document.getElementById('savedTick');
+    if(!el){ el=document.createElement('div'); el.id='savedTick'; el.setAttribute('aria-live','polite'); el.innerHTML='<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Saved</span>'; (document.getElementById('gameWrap')||document.body).appendChild(el); }
+    el.classList.add('show'); clearTimeout(saveTickT); saveTickT=setTimeout(()=>el.classList.remove('show'),1400); }catch(e){}
+}
+function writeSaveNow(quiet){
+  if(!saveReady) return false;
+  normalizeSave();
+  const js=JSON.stringify(save); if(js===saveLastJs) return true;
+  const prog=saveProgress(save);
+  /* never let a fresh/default save replace one that has real progress */
+  if(prog===0&&saveStoredProg>0){ const cur=parseSave(readLS(SAVE_KEY))||parseSave(readLS(SAVE_BAK)); if(cur&&saveProgress(cur)>0){ save=mergeSaves(save,cur); normalizeSave(); return writeSaveNow(quiet); } }
+  let ok=false;
+  try{ const prev=localStorage.getItem(SAVE_KEY), pv=parseSave(prev); localStorage.setItem(SAVE_KEY,js); ok=true; lsOK=true;
+    /* backup: the newest save, unless this one has less progress than the previous one (then keep the previous as the backup) */
+    try{ localStorage.setItem(SAVE_BAK,(pv&&saveProgress(pv)>prog)?prev:js); }catch(e){} }catch(e){ lsOK=false; }
+  const ext=storageOK?extStorage():null; if(ext){ try{ const pr=ext.set(SAVE_KEY,js); if(pr&&pr.catch) pr.catch(()=>{}); ok=true; }catch(e){} }
+  if(ok){ saveLastJs=js; saveStoredProg=Math.max(saveStoredProg,prog); if(!quiet) showSavedTick(); }
+  return ok;
 }
 async function persist(){
   refreshCoinChips();
-  const js=JSON.stringify(save);
-  try{ localStorage.setItem(SAVE_KEY,js); }catch(e){}
-  if(storageOK){ try{ await window.storage.set(SAVE_KEY,js); }catch(e){} }
+  writeSaveNow(false);
 }
+/* safety net: anything that changed (coins picked up mid-level, settings) is saved within 2s, and right away when the iPad hides or closes the tab */
+setInterval(()=>writeSaveNow(true),2000);
+addEventListener('pagehide',()=>writeSaveNow(true));
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) writeSaveNow(true); });
+addEventListener('beforeunload',()=>writeSaveNow(true));
 /* save codes: progress you can carry anywhere */
 function exportCode(){ return btoa(unescape(encodeURIComponent(JSON.stringify(save)))); }
 function importCode(code){
   try{
-    const data=JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    const data=JSON.parse(decodeURIComponent(escape(atob(String(code).replace(/\s+/g,'')))));
     if(typeof data.coins!=='number'||!data.stars)return false;
-    save=Object.assign(save,data);
-    save.gear=Object.assign({shield:false,hole:false},save.gear||{});
-    save.best=save.best||{}; save.totalScore=save.totalScore||0;
-    save.up=Object.assign({sprint:0,bark:0,sniff:0,heart:0,speed:0},save.up||{});
-    save.stickers=save.stickers||{}; save.stickerPages=save.stickerPages||{};
-    save.daily=Object.assign({day:'',cleared:false,kind:''},save.daily||{});
-    save.endlessPrizes=save.endlessPrizes||{};
+    /* keep the best of both: an older code never wipes newer progress */
+    save=mergeSaves(save,data);
+    normalizeSave();
     persist(); return true;
   }catch(e){ return false; }
 }
@@ -2607,7 +2690,7 @@ function startMouseLevel(idx){
     cheese:spec.cheese.map(s=>({x:tcx(s.c),y:tcx(s.r),taken:false,bob:Math.random()*TAU})), got:0, goal:spec.cheese.length,
     babies:spec.babies.map((s,i)=>({x:tcx(s.c),y:tcx(s.r),hx:tcx(s.c),hy:tcx(s.r),state:'wait',anim:i,face:1})), saved:0,
     air:1, stuffy:false, hideDur:spec.hide*K.hide, hist:[], tags:0, hidN:0, won:null, waitTold:false, hideTold:false};
-  mouseRecord().played=(mouseRecord().played|0)+1;
+  { const rec=mouseRecord(); rec.played=(rec.played|0)+1; }
   showScreen(null);
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('abilitybar').classList.remove('hidden');
@@ -6354,8 +6437,8 @@ async function openEditor(){
   if(!editGrid){
     editGrid=blankGrid();
     let raw=null;
-    try{ if(window.storage){const r=await window.storage.get('tomPaws-custom'); if(r&&r.value)raw=r.value;} }catch(e){}
-    if(!raw){ try{ raw=localStorage.getItem('tomPaws-custom'); }catch(e){} }
+    try{ raw=localStorage.getItem('tomPaws-custom'); }catch(e){}
+    if(!raw){ try{ const ext=extStorage(); if(ext){const r=await ext.get('tomPaws-custom'); if(r&&r.value)raw=r.value;} }catch(e){} }
     if(raw){ const gr=validGrid(raw); if(gr){editGrid=gr;toast('Loaded your saved level!');} }
   }
   g.state='edit';
@@ -6379,21 +6462,23 @@ async function openEditor(){
   const mk=(txt,cls,fn)=>{const b=document.createElement('button');b.className='btn small '+cls;b.textContent=txt;b.onclick=fn;bar.appendChild(b);};
   mk('Play Dog','green',()=>playCustom('dog'));
   mk('Play Cat','blue',()=>playCustom('cat'));
-  mk('Save','',saveCustom);
+  mk('Save','',()=>saveCustom());
   mk('Clear','ghost',()=>{editGrid=blankGrid();game.level.grid=editGrid;toast('Cleared! Start painting.');});
-  mk('Menu','ghost',()=>{hideEditor();exitToMenu();});
+  mk('Menu','ghost',()=>{if(editGrid)saveCustom(true);hideEditor();exitToMenu();});
 }
 function openEditorBar(){ if(game.state==='edit')openEditor(); }
 function customDef(){return {b:'yard',time:75,dog:1.05,coins:0,bushes:0,puds:0,crates:0,tele:0,
   blocks:{fence:5,bush:3,pud:3,toy:1},tip:'Your very own level!'};}
-async function saveCustom(){
+async function saveCustom(quiet){
   const js=JSON.stringify(editGrid);
   let ok=false;
   try{ localStorage.setItem('tomPaws-custom',js); ok=true; }catch(e){}
-  try{ if(window.storage){await window.storage.set('tomPaws-custom',js); ok=true;} }catch(e){}
+  try{ const ext=extStorage(); if(ext){await ext.set('tomPaws-custom',js); ok=true;} }catch(e){}
+  if(quiet) return ok;
   toast(ok?'Level saved! It\u2019ll be here next time.':'Couldn\u2019t save — but you can still play it!');
 }
 function playCustom(mode){
+  if(editGrid) saveCustom(true);
   hideEditor();
   if(mode)game.mode=mode;
   const grid=editGrid.map(r=>r.slice());
@@ -6544,7 +6629,8 @@ $('donutClassic').onclick=()=>{SFX.unlock();startDonutDash('classic');};
 $('donutNight').onclick=()=>{SFX.unlock();startDonutDash('night');};
 $('donutEndless').onclick=()=>{SFX.unlock();startDonutDash('endless');};
 $('btnEdit').onclick=()=>{SFX.unlock();openEditor();};
-$('btnSave').onclick=()=>{$('exportBox').value=exportCode();$('importBox').value='';showScreen('scr-save');};
+$('btnSave').onclick=()=>{writeSaveNow(true); $('exportBox').value=exportCode();$('importBox').value=''; const st=Object.values(save.stars||{}).reduce((a,b)=>a+(+b||0),0)+Object.values((save.mouse&&save.mouse.stars)||{}).reduce((a,b)=>a+(+b||0),0);
+  $('saveHave').textContent='Saved here: '+st+' stars, '+Object.keys(save.stickers||{}).length+' stickers, '+save.coins+' coins'+(lsOK?'':' (not kept: Private Browsing)'); showScreen('scr-save');};
 $('saveBack').onclick=()=>showScreen('scr-menu');
 $('copySave').onclick=()=>{
   const box=$('exportBox'); box.select&&box.select();
@@ -6552,7 +6638,7 @@ $('copySave').onclick=()=>{
   else{try{document.execCommand('copy');toast('Copied!');}catch(e){toast('Select the code and copy it manually');}}
 };
 $('loadSaveBtn').onclick=()=>{
-  if(importCode($('importBox').value)){toast('Progress loaded!');refreshCoinChips();showScreen('scr-menu');}
+  if(importCode($('importBox').value)){toast('Progress loaded! Your best stars from both are kept.');refreshCoinChips();showScreen('scr-menu');}
   else toast('Hmm, that code doesn\u2019t look right — check it and try again');
 };
 $('howBack').onclick=()=>showScreen('scr-menu');
