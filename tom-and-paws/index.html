@@ -272,6 +272,12 @@ body.touch.tablet .skincard{width:130px;min-height:120px}
 #scr-mouse .mouse-notes{font-size:14px;margin:8px auto 8px;max-width:640px}
 #scr-mouse #mouseLevelRow .btn{min-width:150px}
 @media (max-height:520px){ #scr-mouse figure{max-width:230px} #scr-mouse .mouse-notes{font-size:12px;margin:4px auto} #scr-mouse h2{font-size:20px!important} }
+/*FREEZE-FIX-BEGIN: pointer always visible on desktop; big Resume */
+html,body{cursor:default}
+#game,#gameWrap{cursor:default}
+#pauseResume{font-size:26px;padding:16px 46px;min-width:230px}
+#pauseResume:focus-visible{outline:4px solid var(--sun,#ffd93d);outline-offset:3px}
+/*FREEZE-FIX-END*/
 /*SAVE-UX-BEGIN*/
 #savedTick{position:absolute;right:10px;bottom:10px;z-index:60;display:flex;align-items:center;gap:4px;background:rgba(255,248,232,.92);color:#2e8b57;border:2px solid rgba(59,46,74,.35);border-radius:999px;padding:3px 10px 3px 7px;font-weight:800;font-size:12px;pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .25s,transform .25s}
 #savedTick.show{opacity:1;transform:none}
@@ -1169,6 +1175,8 @@ window.addEventListener('keydown',e=>{
   keys[e.key.toLowerCase()]=true;
   if(game.state==='play') handleActionKeys(e.key.toLowerCase());
   if(e.key==='Escape'){ if(game.state==='play')pauseGame(); else if(game.state==='pause')resumeGame(); }
+  else if(game.state==='pause'&&(e.key==='p'||e.key==='P')){ resumeGame(); }
+  else if(game.state==='play'&&(e.key==='p'||e.key==='P')&&!game.vs){ pauseGame(); }
 });
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
 cv.addEventListener('mousemove',e=>{
@@ -6574,6 +6582,7 @@ function showWorldTransition(w,idx){
 function endTransition(){
   if(game.state!=='transition')return;
   game.state='play'; showScreen(null); SFX.coin();
+  if(game.blurredDuringIntro&&!game.vs){ game.blurredDuringIntro=false; if(!document.hasFocus()||document.hidden) autoPause(); }
 }
 $('scr-world').onclick=()=>endTransition();
 function drawWorldArt(t){
@@ -6596,8 +6605,8 @@ function drawWorldArt(t){
   }
 }
 /* ---- pause ---- */
-function pauseGame(){ if(game.state!=='play')return; game.state='pause'; setPlayingUI(false); showScreen('scr-pause'); if(game.vs){ if(!VS.netPause){ VS.pausedByNet=false; vsSend({k:'pause'}); $('vsPauseNote').textContent='Paused for both players.'; } } else if($('vsPauseNote')) $('vsPauseNote').textContent=''; if(game.vs){ if(!VS.netPause){ vsSend({k:'pause'}); $('vsPauseNote').textContent='Paused for both players.'; } } else if($('vsPauseNote')) $('vsPauseNote').textContent=''; if(typeof layoutAudioToggles==='function') layoutAudioToggles(); else if(typeof syncAudioToggleLabels==='function') syncAudioToggleLabels(); }
-function resumeGame(){ if(game.state!=='pause')return; game.state='play'; setPlayingUI(true); showScreen(null); if(game.vs&&!VS.netPause) vsSend({k:'resume'});
+function pauseGame(){ if(game.state!=='play')return; game.state='pause'; game.autoPaused=false; releaseAllInput(); showCursor(); setTimeout(()=>{ try{ if(game.state==='pause'&&!document.body.classList.contains('touch')) $('pauseResume').focus({preventScroll:true}); }catch(e){} },30); setPlayingUI(false); showScreen('scr-pause'); if(game.vs){ if(!VS.netPause){ VS.pausedByNet=false; vsSend({k:'pause'}); $('vsPauseNote').textContent='Paused for both players.'; } } else if($('vsPauseNote')) $('vsPauseNote').textContent=''; if(game.vs){ if(!VS.netPause){ vsSend({k:'pause'}); $('vsPauseNote').textContent='Paused for both players.'; } } else if($('vsPauseNote')) $('vsPauseNote').textContent=''; if(typeof layoutAudioToggles==='function') layoutAudioToggles(); else if(typeof syncAudioToggleLabels==='function') syncAudioToggleLabels(); }
+function resumeGame(){ if(game.state!=='pause')return; game.state='play'; game.autoPaused=false; lastT=performance.now(); releaseAllInput(); setPlayingUI(true); showScreen(null); if(game.vs&&!VS.netPause) vsSend({k:'resume'});
   if(MUSIC.isOn()&&!MUSIC.playing())MUSIC.start(game.zombie?'zombie':(game.donut?'bakery':LEVELS[game.levelIdx].b),game.levelIdx); }
 function exitToMenu(){ setPlayingUI(false);
   if(game.vs){ game.vs=null; if(VS.prevMode) game.mode=VS.prevMode; } if($('pauseRestart'))$('pauseRestart').style.display=''; if($('pauseExit'))$('pauseExit').textContent='Exit to menu';
@@ -9237,8 +9246,20 @@ function ccDrawBang(e){
 window.__cc=CC;
 let lastT=performance.now();
 let polFrameN=0;
+/* crash-proof loop: the next frame is booked first, so one bad frame can never freeze the game; a watchdog restarts it if frames ever stop */
+let loopRafId=0, loopLastRun=performance.now(), loopErrRun=0; window.__loopErrors=[];
 function loop(now){
-  const dt=Math.min(.05,(now-lastT)/1000); lastT=now;
+  loopRafId=requestAnimationFrame(loop); loopLastRun=performance.now();
+  try{ loopFrame(now); loopErrRun=0; }
+  catch(e){ loopErrRun++; const m=String(e&&e.stack||e).slice(0,300); if(window.__loopErrors.length<30) window.__loopErrors.push(m);
+    if(window.__loopErrors.length<=3){ console.warn('Tom and Paw: a frame hit an error, the game keeps running.',e); setTimeout(()=>{ throw e; },0); }
+    lastT=performance.now();
+    if(loopErrRun>=90&&game.state==='play'){ loopErrRun=0; try{ exitToMenu(); toast('Oops! That level got stuck. Try it again!',3000); }catch(_){} } }
+}
+function startLoop(){ if(loopRafId) cancelAnimationFrame(loopRafId); lastT=performance.now(); loopRafId=requestAnimationFrame(loop); }
+setInterval(()=>{ if(!document.hidden&&performance.now()-loopLastRun>1500&&loopRafId) startLoop(); },1000);
+function loopFrame(now){
+  const dt=Math.min(.05,Math.max(0,(now-lastT)/1000)); lastT=now;
   const ft0=performance.now();
   if((polFrameN++%30)===0) polResize();
   if(game.state==='play') polAdapt(now);
@@ -9251,7 +9272,6 @@ function loop(now){
   if(game.state==='play') polFrameSample(performance.now()-ft0);
   drawCoverArt(now/1000); drawMenuArt(now/1000); drawPreviews(now/1000); drawWorldArt(now/1000); drawHomeArt(now/1000);
   if(game.state==='transition'&&now-game.transStart>2600)endTransition();
-  requestAnimationFrame(loop);
 }
 loadSave().then(()=>{
   if(shouldSkipCover()){
@@ -9261,7 +9281,7 @@ loadSave().then(()=>{
   }else{
     showScreen('scr-cover');
   }
-  requestAnimationFrame(loop);
+  startLoop();
 });
 /* top-down probe: A moves left (x down), D moves right (x up). Not a chase-cam vehicle. */
 window.__controlsTest={
@@ -9312,11 +9332,21 @@ window.__controlsTest={
   refreshTouchFlags(){ refreshTouchFlags(); },
 };
 window.addEventListener('pointerdown',()=>SFX.unlock(),{once:true});
-window.addEventListener('blur',()=>{ if(game.state==='play'){pauseGame();MUSIC.stop();} });
+/* window blur / tab hidden: let go of every key, and pause with the big Resume button showing (never a silent frozen frame) */
+function releaseAllInput(){ for(const k in keys) keys[k]=false; try{ TOUCH.ax=0; TOUCH.ay=0; }catch(e){} try{ if(document.pointerLockElement&&document.exitPointerLock) document.exitPointerLock(); }catch(e){} }
+function autoPause(){ releaseAllInput(); if(game.state==='play'){ pauseGame(); game.autoPaused=true; MUSIC.stop(); } else if(game.state==='transition') game.blurredDuringIntro=true; }
+window.addEventListener('blur',()=>{ releaseAllInput(); if(game.state==='play'||game.state==='transition') autoPause(); });
+window.addEventListener('focus',()=>{ releaseAllInput(); showCursor();
+  /* Chill: come straight back after a short breath; other levels wait on the Pause screen */
+  if(game.state==='pause'&&game.autoPaused&&save.diff==='chill'&&!game.vs){ setTimeout(()=>{ if(game.state==='pause'&&game.autoPaused&&document.hasFocus()&&!document.hidden) resumeGame(); },700); } });
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){ if(game.state==='play'&&!game.vs){ pauseGame(); } MUSIC.stop(); }
-  else { SFX.ctx(); }   /* iPad: wake the audio engine so Resume has sound */
+  if(document.hidden){ releaseAllInput(); if((game.state==='play'||game.state==='transition')&&!game.vs){ autoPause(); } MUSIC.stop(); }
+  else { try{ SFX.ctx(); }catch(e){} lastT=performance.now(); showCursor(); }   /* iPad: wake the audio engine so Resume has sound */
 });
+/* the mouse pointer always comes back: on any move, on pause, on menus */
+function showCursor(){ try{ for(const el of [document.documentElement,document.body,cv]) if(el&&el.style.cursor==='none') el.style.cursor=''; }catch(e){} }
+window.addEventListener('mousemove',showCursor,{passive:true});
+window.addEventListener('mouseenter',showCursor,{passive:true});
 addEventListener('resize',()=>{ polResize(); });
 </script>
 </body>
