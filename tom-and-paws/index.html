@@ -973,6 +973,7 @@ const SFX=(()=>{let ac=null,muted=false;
     fish(){tone(660,.1,'triangle',.14);setTimeout(()=>tone(990,.14,'triangle',.14),80)},
     place(){tone(220,.08,'square',.12,120)},
     chew(){tone(140,.06,'sawtooth',.08,-40)},
+    rumble(){tone(52,1.6,'sine',.09,-14);setTimeout(()=>tone(73,1.2,'triangle',.04,-22),140)},
     breakSfx(){tone(120,.18,'sawtooth',.16,-80)},
     dash(){tone(300,.18,'sawtooth',.1,500)},
     thwip(){tone(1400,.07,'square',.14,-1100);setTimeout(()=>tone(500,.06,'sawtooth',.08,-300),50)},
@@ -999,6 +1000,7 @@ const MUSIC=(()=>{
     iceberg:{root:262,bpm:96,minor:false}, candy:{root:294,bpm:126,minor:false},
     bakery:{root:330,bpm:132,minor:false},
     zombie:{root:196,bpm:108,minor:false},
+    storm:{root:185,bpm:92,minor:true}, halloween:{root:233,bpm:118,minor:true},
     volcano:{root:196,bpm:116,minor:true}, flower:{root:247,bpm:112,minor:false},
     water:{root:233,bpm:88,minor:false},   spider:{root:185,bpm:100,minor:true},
     sky:{root:277,bpm:108,minor:false}, city:{root:208,bpm:120,minor:false}, sewer:{root:175,bpm:98,minor:true}, home:{root:294,bpm:114,minor:false},
@@ -1087,6 +1089,7 @@ function normalizeSave(){
   save.daily=Object.assign({day:'',cleared:false,kind:''},save.daily||{});
   save.endlessPrizes=save.endlessPrizes||{};
   if(save.mouse){ save.mouse=Object.assign({stars:{},played:0},save.mouse); save.mouse.stars=save.mouse.stars||{}; }
+  if(save.themes&&typeof save.themes==='object'){ for(const k of ['storm','halloween']) if(save.themes[k]){ save.themes[k]=Object.assign({wins:0,stars:{}},save.themes[k]); save.themes[k].stars=save.themes[k].stars||{}; } } else delete save.themes;
   if(typeof save.coins!=='number'||!isFinite(save.coins)) save.coins=0;
   if(!['small','medium','large'].includes(save.ctrlSize)) save.ctrlSize='medium';
 }
@@ -1100,6 +1103,7 @@ function mergeSaves(base,inc){
   out.skins={}; for(const w of ['cat','dog']) out.skins[w]=[...new Set([...((base.skins||{})[w]||[]),...((inc.skins||{})[w]||[])])];
   out.coins=mx(base.coins,inc.coins); out.totalScore=mx(base.totalScore,inc.totalScore); out.bestWave=mx(base.bestWave,inc.bestWave);
   if(base.mouse||inc.mouse){ const a=base.mouse||{}, b=inc.mouse||{}; out.mouse=Object.assign({},a,b,{stars:maxMap(a.stars,b.stars),played:mx(a.played,b.played)}); }
+  if(base.themes||inc.themes){ out.themes={}; for(const k of ['storm','halloween']){ const a=(base.themes||{})[k], b=(inc.themes||{})[k]; if(a||b) out.themes[k]={wins:mx((a||{}).wins,(b||{}).wins),stars:maxMap((a||{}).stars,(b||{}).stars)}; } }
   const da=base.daily||{}, db=inc.daily||{}; out.daily=(String(db.day||'')>=String(da.day||''))?db:da;
   return out;
 }
@@ -1551,6 +1555,8 @@ const BIOMES={
   spider: {name:'Spider Grove',  g1:'#6f8f5f',g2:'#63805'+'3',wall:'#3d4a33',wallTop:'#54644a',deco:'*'},
   moon:   {name:'Moon Fair',     g1:'#e4d8ff',g2:'#d5c4fb',wall:'#7a68b0',wallTop:'#9a88d0',deco:'*',night:true},
   laundry:{name:'Laundry Room',  g1:'#e8f4ff',g2:'#d6ebff',wall:'#7aa0c4',wallTop:'#9dbddb',deco:'*'},
+  storm:  {name:'Storm Sky',     g1:'#8fb0c2',g2:'#83a5b8',wall:'#4a5d73',wallTop:'#66809a',deco:'*',storm:true},
+  halloween:{name:'Pumpkin Night',g1:'#9a8bc0',g2:'#8e7fb5',wall:'#4b3570',wallTop:'#6a4f96',deco:'*',halloween:true},
 };
 /* 12 levels: difficulty & toys scale up, mechanics introduced gradually */
 const LEVELS=[
@@ -1616,6 +1622,16 @@ const LEVELS=[
  {b:'moon',seed:1113,walls:14, time:75, dog:1.16,coins:15, bushes:4, puds:2, crates:3, tele:1, lava:0, moonBalloon:5, bounce:3, moonfair:true, blocks:{fence:6,bush:3,pud:4,toy:2}, tip:'Balloons + bounce clouds! Mix both toys for big WHOOSH rides.'},
  {b:'moon',seed:1125,walls:17, time:78, dog:1.20,coins:16, bushes:4, puds:2, crates:3, tele:2, lava:0, moonBalloon:5, wind:true, moonfair:true, blocks:{fence:6,bush:4,pud:4,toy:2}, tip:'Wind + balloons! A toast warns before gusts — float over trouble!'},
  {b:'moon',seed:1137,walls:12, time:88, dog:1.18,coins:18, bushes:4, puds:2, crates:3, tele:2, lava:0, moonBalloon:6, bounce:4, moonfair:true, parade:true, blocks:{fence:7,bush:4,pud:5,toy:2}, tip:'MOON PARADE! Catch glowing tickets, then race HOME through the fireworks!'},
+ /* ---- WORLD 13: STORM SKY — wind, rain and growing puddles; umbrellas keep you steady ---- */
+ {b:'storm',seed:1201,walls:10, time:74, dog:1.06,coins:14, bushes:4, puds:3, crates:2, tele:0, lava:0, storm:true, umbrellas:2, grow:3, blocks:{fence:5,bush:3,pud:4,toy:2}, tip:'STORM SKY! Wind gusts push you sideways. Grab a yellow UMBRELLA and the wind can\u2019t push you!'},
+ {b:'storm',seed:1213,walls:13, time:76, dog:1.10,coins:15, bushes:4, puds:4, crates:3, tele:1, lava:0, storm:true, umbrellas:2, grow:4, blocks:{fence:6,bush:3,pud:4,toy:2}, tip:'Puddles grow in the rain and slow everyone down. Lead the chase through them!'},
+ {b:'storm',seed:1225,walls:16, time:78, dog:1.14,coins:16, bushes:4, puds:4, crates:3, tele:1, lava:0, storm:true, umbrellas:3, grow:5, blocks:{fence:6,bush:4,pud:4,toy:2}, tip:'Watch the wind arrow at the bottom: it warns you before every gust.'},
+ {b:'storm',seed:1237,walls:19, time:82, dog:1.18,coins:17, bushes:5, puds:5, crates:4, tele:2, lava:0, storm:true, umbrellas:3, grow:6, blocks:{fence:7,bush:4,pud:5,toy:2}, tip:'Biggest storm! Umbrella up, splash through, and race to the door.'},
+ /* ---- WORLD 14: PUMPKIN NIGHT — friendly ghosts, bats and candy corn ---- */
+ {b:'halloween',seed:1301,walls:10, time:74, dog:1.06,coins:14, bushes:5, puds:1, crates:3, tele:0, lava:0, halloween:true, ghosts:2, blocks:{fence:5,bush:3,pud:4,toy:2}, tip:'PUMPKIN NIGHT! Grab the candy corn to open the door. Friendly ghosts just bump you softly. Hide in the pumpkin patch!'},
+ {b:'halloween',seed:1313,walls:13, time:76, dog:1.10,coins:15, bushes:5, puds:1, crates:3, tele:1, lava:0, halloween:true, ghosts:3, blocks:{fence:6,bush:3,pud:4,toy:2}, tip:'More friendly ghosts floating around. Win this one for a Witch costume!'},
+ {b:'halloween',seed:1325,walls:16, time:78, dog:1.14,coins:16, bushes:6, puds:2, crates:3, tele:1, lava:0, halloween:true, ghosts:3, blocks:{fence:6,bush:4,pud:4,toy:2}, tip:'Jack-o\u2019-lanterns light the way. Use the pumpkin patch to hide!'},
+ {b:'halloween',seed:1337,walls:19, time:82, dog:1.18,coins:17, bushes:6, puds:2, crates:4, tele:2, lava:0, halloween:true, ghosts:4, blocks:{fence:7,bush:4,pud:5,toy:2}, tip:'Big pumpkin party! Win it for the Pumpkin Paw costume!'},
 ];
 
 function genLevel(idx){
@@ -2302,12 +2318,14 @@ const STICKER_DEFS=[
   {id:'pageParade', title:'Daily & Endless', ids:['dailyClear','wave10','wave25','wave50','moonParade']},
   {id:'pageFriends', title:'Play Together', ids:['twoPlayer']},
   {id:'pageMouse', title:'Mouse Chase', ids:['mouse0','mouse1','mouse2','mouse3']},
+  {id:'pageStorm', title:'Storm Sky', ids:['storm0','storm1','storm2','storm3']},
+  {id:'pageHalloween', title:'Pumpkin Night', ids:['hal0','hal1','hal2','hal3']},
 ];
 const STICKER_LOOK={
   clearcat0:'Forest',clearcat5:'Ice',clearcat10:'Candy',clearcat16:'Volcano',clearcat23:'Flower',clearcat27:'Cove',clearcat30:'Spider',clearcat32:'Sky',clearcat35:'City',clearcat38:'Sewer',clearcat42:'Puppy',clearcat45:'Moon',
   w0:'Bone',w5:'Bloom',w10:'Sweet',w16:'Lava',w23:'Bug',w27:'Shell',w30:'Web',w32:'Kite',w35:'Taxi',w38:'Rat',w42:'Ball',w45:'Ticket',
   donutDash:'Donut',donutSat:'Sat',zombie0:'Nap',zombie1:'Patch',zombie2:'Moon',zombie3:'Cheese',zombie4:'Bell',zombie5:'Line',
-  sock0:'Sock',sock1:'Basket',sock2:'Bandit',mouse0:'Peek',mouse1:'Pot',mouse2:'Moon',mouse3:'Pals',twoPlayer:'2P',dailyClear:'Daily',wave10:'W10',wave25:'W25',wave50:'W50',moonParade:'Parade'
+  sock0:'Sock',sock1:'Basket',sock2:'Bandit',mouse0:'Peek',mouse1:'Pot',mouse2:'Moon',mouse3:'Pals',storm0:'Drop',storm1:'Splash',storm2:'Gust',storm3:'Bolt',hal0:'Corn',hal1:'Ghost',hal2:'Bat',hal3:'Jack',twoPlayer:'2P',dailyClear:'Daily',wave10:'W10',wave25:'W25',wave50:'W50',moonParade:'Parade'
 };
 function earnSticker(id, toastMsg){
   if(!id)return;
@@ -3052,6 +3070,164 @@ function mouseIntroAnim(){
 }
 window.__mouse={ levels:()=>MOUSE_LEVELS.length, start:i=>startMouseLevel(i), st:()=>game.mouse, open:()=>openMouseMenu() };
 /*MOUSE-END*/
+
+/* ---------------- STORM + HALLOWEEN worlds (reuse the campaign engine: tiles, fish, door, AI) ---------------- */
+const THEME_FROM=49;   /* Storm 49-52, Halloween 53-56 */
+function themeOf(d){ return d&&d.storm?'storm':(d&&d.halloween?'halloween':null); }
+function themeRec(){ save.themes=save.themes||{}; for(const k of ['storm','halloween']){ save.themes[k]=Object.assign({wins:0,stars:{}},save.themes[k]||{}); save.themes[k].stars=save.themes[k].stars||{}; } return save.themes; }
+function themeSpot(g,avoid,minD){
+  for(let k=0;k<160;k++){ const f=randFloor(); const x=tcx(f.c), y=tcx(f.r);
+    if(avoid.every(a=>Math.hypot(a.x-x,a.y-y)>=minD*TILE)) return {x,y,c:f.c,r:f.r}; }
+  const f=randFloor(); return {x:tcx(f.c),y:tcx(f.r),c:f.c,r:f.r};
+}
+function themeInit(g,idx){
+  g.storm=null; g.hal=null; const d=g.level.def, th=themeOf(d); if(!th||g.vs) return;
+  const chill=save.diff==='chill', L=g.level;
+  const avoid=[g.player,g.enemy,{x:tcx(L.exit.c),y:tcx(L.exit.r)}];
+  if(th==='storm'){
+    const S=g.storm={lvl:L, rain:[], fl:0, flPeak:0, flT:(chill?14:9)+Math.random()*5, thunderT:-1,
+      wState:'calm', wT:chill?8:6, dir:1, gustT:0, warnT:0, umb:0, umbs:[], growT:chill?14:9, grown:0, maxGrow:chill?Math.ceil((d.grow||4)/2):(d.grow||4)};
+    for(let i=0;i<(d.umbrellas||2);i++){ const s=themeSpot(g,[...avoid,...S.umbs],3); S.umbs.push({x:s.x,y:s.y,taken:false,resp:0,bob:Math.random()*TAU}); }
+  }else{
+    const H=g.hal={lvl:L, ghosts:[], bats:[]};
+    const n=Math.max(1,(d.ghosts||2)-(chill?1:0));
+    for(let i=0;i<n;i++){ const s=themeSpot(g,[...avoid,...H.ghosts.map(q=>({x:q.hx,y:q.hy}))],4); H.ghosts.push({hx:s.x,hy:s.y,x:s.x,y:s.y,ph:Math.random()*TAU,sp:.55+Math.random()*.3,boo:0}); }
+    for(let i=0;i<5;i++) H.bats.push({x:Math.random()*W,y:30+Math.random()*120,ph:Math.random()*TAU,v:(Math.random()<.5?-1:1)*(18+Math.random()*16)});
+  }
+}
+function themeUpdate(g,dt){
+  const chill=save.diff==='chill', grid=g.level.grid;
+  const S=g.storm;
+  if(S&&S.lvl===g.level){
+    /* wind: calm -> warning (arrow shows) -> sideways gust; umbrellas keep YOU steady */
+    if(S.wState==='calm'){ S.wT-=dt; if(S.wT<=0){ S.wState='warn'; S.warnT=1.6; S.dir=Math.random()<.5?-1:1; toast('Wind coming '+(S.dir>0?'right':'left')+'! Grab an umbrella!',1600); } }
+    else if(S.wState==='warn'){ S.warnT-=dt; if(S.warnT<=0){ S.wState='gust'; S.gustT=chill?2:2.6; SFX.puff(); } }
+    else { S.gustT-=dt; const str=(chill?34:56)*S.dir*dt;
+      for(const e of allEnts()) if(!e.caught&&!g.zip&&!(e===g.player&&S.umb>0)) moveEnt(e,str,0,grid);
+      if(Math.random()<dt*16&&g.particles.length<160) g.particles.push({x:S.dir>0?0:W,y:Math.random()*H,vx:S.dir*300,vy:30,life:.6,max:.6,col:'rgba(220,235,255,.8)',size:2.5});
+      if(S.gustT<=0){ S.wState='calm'; S.wT=(chill?11:7)+Math.random()*4; } }
+    if(S.umb>0) S.umb-=dt;
+    for(const u of S.umbs){ u.bob+=dt*3; if(u.taken){ u.resp-=dt; if(u.resp<=0){ const s=themeSpot(g,[g.player,g.enemy],3); u.x=s.x; u.y=s.y; u.taken=false; } continue; }
+      if(Math.hypot(u.x-g.player.x,u.y-g.player.y)<24){ u.taken=true; u.resp=12; S.umb=chill?10:8; SFX.fish(); poof(u.x,u.y,'#ffd93d'); toast('Umbrella! The wind can\u2019t push you now.',1800); } }
+    /* puddles slowly grow (they only slow you down, never block) */
+    S.growT-=dt;
+    if(S.growT<=0&&S.grown<S.maxGrow){ S.growT=chill?14:9;
+      const puds=[]; for(let r=1;r<ROWS-1;r++)for(let c=1;c<COLS-1;c++) if(grid[r][c]===T.PUD) puds.push({c,r});
+      const busy=(c,r)=>(c===g.level.exit.c&&r===g.level.exit.r)||g.level.items.some(it=>!it.taken&&it.c===c&&it.r===r)||[g.player,g.enemy].some(e=>tx(e.x)===c&&tx(e.y)===r)||(c===g.level.pSpawn.c&&r===g.level.pSpawn.r)||(c===g.level.eSpawn.c&&r===g.level.eSpawn.r);
+      for(let k=0;k<20&&puds.length;k++){ const p=puds[(Math.random()*puds.length)|0]; const [dc,dr]=[[1,0],[-1,0],[0,1],[0,-1]][(Math.random()*4)|0]; const c=p.c+dc, r=p.r+dr;
+        if(grid[r]&&grid[r][c]===T.FLOOR&&!busy(c,r)){ grid[r][c]=T.PUD; S.grown++; break; } } }
+    /* soft lightning: one slow, dim glow now and then; gentle rumble after */
+    S.flT-=dt; if(S.flT<=0){ S.flT=(chill?16:10)+Math.random()*(chill?8:6); S.fl=0.0001; S.flPeak=chill?.06:.11; S.thunderT=1.1; }
+    if(S.fl>0){ S.fl+=dt; if(S.fl>1.9) S.fl=0; }
+    if(S.thunderT>0){ S.thunderT-=dt; if(S.thunderT<=0){ S.thunderT=-1; try{ SFX.rumble(); }catch(e){} } }
+  }
+  const Hh=g.hal;
+  if(Hh&&Hh.lvl===g.level){
+    const push=chill?45:65;
+    for(const q of Hh.ghosts){ q.ph+=dt*q.sp; q.x=q.hx+Math.cos(q.ph)*TILE*1.5; q.y=q.hy+Math.sin(q.ph*1.4)*TILE*.9; if(q.boo>0) q.boo-=dt;
+      for(const e of allEnts()){ if(e.caught) continue; const dx=e.x-q.x, dy=e.y-q.y, dd=Math.hypot(dx,dy);
+        if(dd<30&&dd>0.01){ moveEnt(e,dx/dd*push*dt,dy/dd*push*dt,grid); if(e===g.player&&q.boo<=0){ q.boo=2.5; SFX.sparkle(); } } } }
+    for(const b of Hh.bats){ b.ph+=dt*9; b.x+=b.v*dt; if(b.x<-30) b.x=W+30; if(b.x>W+30) b.x=-30; }
+  }
+}
+/* ---- drawing ---- */
+function drawUmbrella(c,x,y,s){ c.save(); c.translate(x,y); c.scale(s,s);
+  c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(0,12,11,3.5,0,0,TAU); c.fill();
+  c.strokeStyle='#3b2e4a'; c.lineWidth=2.2; c.beginPath(); c.moveTo(0,-6); c.lineTo(0,9); c.quadraticCurveTo(0,13,-4,12); c.stroke();
+  c.fillStyle='#ffd93d'; c.beginPath(); c.moveTo(-13,-3); c.quadraticCurveTo(-12,-16,0,-17); c.quadraticCurveTo(12,-16,13,-3);
+  c.quadraticCurveTo(9,-6,6.5,-3); c.quadraticCurveTo(3,-6,0,-3); c.quadraticCurveTo(-3,-6,-6.5,-3); c.quadraticCurveTo(-9,-6,-13,-3); c.fill();
+  c.strokeStyle='#3b2e4a'; c.lineWidth=1.6; c.stroke(); c.fillStyle='#ff8fb1'; c.beginPath(); c.moveTo(-2,-16.6); c.quadraticCurveTo(0,-10,0,-3); c.quadraticCurveTo(0,-10,2,-16.6); c.fill();
+  c.restore(); }
+function drawCandyCorn(c,x,y){ c.save(); c.translate(x,y); c.scale(1.3,1.3);
+  c.fillStyle='rgba(0,0,0,.16)'; c.beginPath(); c.ellipse(0,10,9,3,0,0,TAU); c.fill();
+  const tri=(y0,y1,w0,w1,col)=>{ c.fillStyle=col; c.beginPath(); c.moveTo(-w0,y0); c.lineTo(w0,y0); c.lineTo(w1,y1); c.lineTo(-w1,y1); c.closePath(); c.fill(); };
+  tri(8,1,9,6.4,'#fff4dc'); tri(1,-5,6.4,3.6,'#ff9a2e'); tri(-5,-11,3.6,.6,'#ffd93d');
+  c.strokeStyle='#7a4a1a'; c.lineWidth=1.3; c.beginPath(); c.moveTo(-9,8); c.lineTo(9,8); c.lineTo(.6,-11); c.lineTo(-.6,-11); c.closePath(); c.stroke();
+  c.fillStyle='rgba(255,255,255,.6)'; c.beginPath(); c.ellipse(-3,2,1.4,3,-.3,0,TAU); c.fill(); c.restore(); }
+function drawJackO(c,x,y,s,lit){ c.save(); c.translate(x,y); c.scale(s,s);
+  c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(0,11,14,4,0,0,TAU); c.fill();
+  const pg=c.createRadialGradient(-4,-4,2,0,0,15); pg.addColorStop(0,'#ffb85c'); pg.addColorStop(1,'#e8731a'); c.fillStyle=pg;
+  c.beginPath(); c.ellipse(-6,1,8,10,0,0,TAU); c.ellipse(6,1,8,10,0,0,TAU); c.ellipse(0,0,8,11,0,0,TAU); c.fill();
+  c.strokeStyle='rgba(150,70,10,.6)'; c.lineWidth=1.2; c.beginPath(); c.moveTo(-3,-9); c.quadraticCurveTo(-5,1,-3,10); c.moveTo(3,-9); c.quadraticCurveTo(5,1,3,10); c.stroke();
+  c.fillStyle='#4f8a2e'; c.fillRect(-1.6,-14,3.2,5); c.beginPath(); c.ellipse(4,-12,4,2,-.4,0,TAU); c.fill();
+  c.fillStyle=lit?'#fff2a0':'#5a2e10';   /* friendly face: round eyes, big smile */
+  c.beginPath(); c.arc(-5,-2,2.4,0,TAU); c.arc(5,-2,2.4,0,TAU); c.fill();
+  c.beginPath(); c.moveTo(-7,3); c.quadraticCurveTo(0,10,7,3); c.quadraticCurveTo(0,6,-7,3); c.fill();
+  c.restore(); }
+function drawGhost(c,q,t){ const x=q.x, y=q.y+Math.sin(t*2+q.ph)*3; c.save(); c.translate(x,y); c.scale(1.3,1.3); c.translate(-x,-y);
+  c.fillStyle='rgba(60,40,90,.16)'; c.beginPath(); c.ellipse(q.x,q.y+16,12,4,0,0,TAU); c.fill();
+  c.globalAlpha=.9; c.fillStyle='#fdfbff'; c.beginPath(); c.moveTo(x-13,y+10); c.lineTo(x-13,y-2); c.arc(x,y-2,13,Math.PI,0); c.lineTo(x+13,y+10);
+  for(let k=0;k<4;k++){ const xx=x+13-(k+1)*6.5; c.quadraticCurveTo(xx+3.25,y+(k%2?7:14)+Math.sin(t*5+k)*1.5,xx,y+10); } c.closePath(); c.fill();
+  c.globalAlpha=1; c.strokeStyle='rgba(120,100,170,.55)'; c.lineWidth=1.4; c.stroke();
+  c.fillStyle='#3b2e4a'; c.beginPath(); c.ellipse(x-4.5,y-3,2,2.6,0,0,TAU); c.ellipse(x+4.5,y-3,2,2.6,0,0,TAU); c.fill();
+  c.fillStyle='#fff'; c.beginPath(); c.arc(x-4,y-4,.8,0,TAU); c.arc(x+5,y-4,.8,0,TAU); c.fill();
+  c.fillStyle='rgba(255,140,170,.55)'; c.beginPath(); c.ellipse(x-8,y+1,2.4,1.5,0,0,TAU); c.ellipse(x+8,y+1,2.4,1.5,0,0,TAU); c.fill();
+  c.strokeStyle='#3b2e4a'; c.lineWidth=1.2; c.beginPath(); c.arc(x,y+1,2.4,.2,Math.PI-.2); c.stroke();
+  if(q.boo>1.6){ c.font='bold 11px sans-serif'; c.textAlign='center'; c.fillStyle='#6a3fa0'; c.fillText('boo!',x,y-20); }
+  c.restore(); }
+function drawBat(c,b){ const f=Math.sin(b.ph)*.8; c.save(); c.translate(b.x,b.y); c.scale(b.v<0?-1:1,1);
+  c.fillStyle='#5b3f8c'; for(const s of [-1,1]){ c.beginPath(); c.moveTo(0,0); c.quadraticCurveTo(s*8,-8*f-4,s*15,-3*f); c.quadraticCurveTo(s*11,1,s*9,3); c.quadraticCurveTo(s*6,1,s*4,4); c.closePath(); c.fill(); }
+  c.beginPath(); c.ellipse(0,1,4.5,5,0,0,TAU); c.fill(); c.beginPath(); c.moveTo(-3,-3); c.lineTo(-2,-7); c.lineTo(0,-4); c.lineTo(2,-7); c.lineTo(3,-3); c.fill();
+  c.fillStyle='#fff'; c.beginPath(); c.arc(-1.6,0,1.1,0,TAU); c.arc(1.6,0,1.1,0,TAU); c.fill(); c.fillStyle='rgba(255,150,180,.8)'; c.beginPath(); c.arc(-2.8,2.2,.9,0,TAU); c.arc(2.8,2.2,.9,0,TAU); c.fill();
+  c.restore(); }
+const THEME_TINT={};
+function themeTint(kind){ if(THEME_TINT[kind]) return THEME_TINT[kind]; const cv2=document.createElement('canvas'); cv2.width=W/4; cv2.height=H/4; const x=cv2.getContext('2d');
+  const gr=x.createLinearGradient(0,0,0,cv2.height);
+  if(kind==='storm'){ gr.addColorStop(0,'rgba(20,34,80,.34)'); gr.addColorStop(1,'rgba(30,60,110,.16)'); }
+  else { gr.addColorStop(0,'rgba(70,30,120,.30)'); gr.addColorStop(.7,'rgba(90,40,120,.12)'); gr.addColorStop(1,'rgba(255,140,50,.18)'); }
+  x.fillStyle=gr; x.fillRect(0,0,cv2.width,cv2.height); THEME_TINT[kind]=cv2; return cv2; }
+let themeLastNow=0;
+function themeDrawItems(g){
+  const S=g.storm; if(S&&S.lvl===g.level) for(const u of S.umbs) if(!u.taken) drawUmbrella(cx,u.x,u.y-Math.sin(u.bob)*2,1.15);
+}
+function themeOverlay(g){
+  const now=performance.now(), rdt=Math.min(.05,Math.max(0,(now-themeLastNow)/1000)); themeLastNow=now; const t=g.time, chill=save.diff==='chill';
+  const S=g.storm, Hh=g.hal;
+  if(S&&S.lvl===g.level){
+    cx.drawImage(themeTint('storm'),0,0,W,H);
+    /* rain: capped, cheap straight streaks */
+    const cap=(POL.rsCap&&POL.rsCap<1.5)?40:(chill?55:80);
+    while(S.rain.length<cap) S.rain.push({x:Math.random()*(W+80)-40,y:Math.random()*H,v:520+Math.random()*220,l:9+Math.random()*7});
+    const slant=(S.wState==='gust'?S.dir*.45:-.12);
+    cx.strokeStyle='rgba(250,252,255,.72)'; cx.lineWidth=1.6; cx.beginPath();
+    for(const d of S.rain){ d.y+=d.v*rdt; d.x+=d.v*slant*rdt; if(d.y>H){ d.y=-10; d.x=Math.random()*(W+80)-40; } if(d.x<-40) d.x=W+30; if(d.x>W+40) d.x=-30;
+      cx.moveTo(d.x,d.y); cx.lineTo(d.x-d.l*slant,d.y-d.l); }
+    cx.stroke();
+    /* soft lightning glow (slow rise and fade, dim) */
+    if(S.fl>0){ const a=S.fl<.45?S.fl/.45:Math.max(0,1-(S.fl-.45)/1.45); cx.fillStyle='rgba(235,235,255,'+(a*S.flPeak).toFixed(3)+')'; cx.fillRect(0,0,W,H); }
+    /* wind indicator */
+    if(S.wState!=='calm'||S.umb>0){ const bx=W/2, by=82; cx.save(); cx.globalAlpha=.92; cx.fillStyle='#fff8e8'; cx.strokeStyle='#3b2e4a'; cx.lineWidth=2.5;
+      rr(bx-104,by-18,208,36,18); cx.fill(); cx.stroke();
+      if(S.wState!=='calm'){ const pulse=S.wState==='warn'?(.5+.5*Math.sin(t*10)):1; cx.globalAlpha=.55+.45*pulse; cx.strokeStyle='#4f7ad6'; cx.lineWidth=4; cx.lineCap='round';
+        for(let k=0;k<3;k++){ const ox=bx-40+k*24+((t*60)%24)*(S.dir); cx.beginPath(); cx.moveTo(ox-10*S.dir,by-6+k*4-4); cx.lineTo(ox+10*S.dir,by-6+k*4-4); cx.stroke(); }
+        cx.fillStyle='#4f7ad6'; cx.beginPath(); const ax=bx+(S.dir>0?44:-44); cx.moveTo(ax+10*S.dir,by); cx.lineTo(ax-4*S.dir,by-9); cx.lineTo(ax-4*S.dir,by+9); cx.closePath(); cx.fill(); cx.globalAlpha=1; }
+      cx.fillStyle='#3b2e4a'; cx.font='bold 12px sans-serif'; cx.textAlign='center'; cx.textBaseline='middle';
+      cx.fillText(S.umb>0?'Umbrella '+Math.ceil(S.umb)+'s':(S.wState==='warn'?'WIND!':'WHOOSH'),S.dir>0?bx-70:bx+70,by+1);
+      if(S.umb>0) drawUmbrella(cx,S.dir>0?bx+64:bx-64,by+4,.7);
+      cx.restore(); }
+    if(S.umb>0){ drawUmbrella(cx,g.player.x+10,g.player.y-30,.9); }
+  }
+  if(Hh&&Hh.lvl===g.level){
+    cx.drawImage(themeTint('halloween'),0,0,W,H);
+    /* moon over the top-right hedge, with a soft glow */
+    const mx=Math.round(W*.68), my=24; const mg=cx.createRadialGradient(mx,my,6,mx,my,46); mg.addColorStop(0,'rgba(255,240,190,.55)'); mg.addColorStop(1,'rgba(255,240,190,0)');
+    cx.fillStyle=mg; cx.beginPath(); cx.arc(mx,my,46,0,TAU); cx.fill(); cx.fillStyle='#fff3c4'; cx.beginPath(); cx.arc(mx,my,15,0,TAU); cx.fill();
+    cx.fillStyle='rgba(220,200,140,.6)'; cx.beginPath(); cx.arc(mx-5,my-3,3,0,TAU); cx.arc(mx+5,my+5,2,0,TAU); cx.fill();
+    for(const b of Hh.bats) drawBat(cx,b);
+    for(const q of Hh.ghosts) drawGhost(cx,q,t);
+  }
+}
+/* wins: own records, stickers, costume prizes */
+function themeOnWin(g,stars){
+  const th=themeOf(g.level&&g.level.def); if(!th||g.vs||g.customPlay) return;
+  const rec=themeRec()[th], k=g.mode+(g.levelIdx-(th==='storm'?49:53));
+  rec.wins=(rec.wins|0)+1; rec.stars[k]=Math.max(rec.stars[k]|0,stars|0);
+  const n=g.levelIdx-(th==='storm'?49:53);
+  earnSticker((th==='storm'?'storm':'hal')+n, th==='storm'?'Storm sticker!':'Halloween sticker!');
+  if(th==='halloween'&&n>=1&&!save.skins.cat.includes('witch')){ save.skins.cat.push('witch'); setTimeout(()=>toast('Costume unlocked: Witch Tom! See the Wardrobe.',3000),2400); }
+  if(th==='halloween'&&n>=3&&!save.skins.dog.includes('pumpkin')){ save.skins.dog.push('pumpkin'); setTimeout(()=>toast('Costume unlocked: Pumpkin Paw! See the Wardrobe.',3000),5600); }
+  persist();
+}
 
 /* ---------------- DOUGHNUT DASH (mini-game) ----------------
    The dog has to eat every doughnut. Nothing here replaces
@@ -4119,7 +4295,7 @@ function startLevel(idx,custom){
   document.getElementById('abilitybar').classList.remove('hidden');
   document.getElementById('buildbar').classList.toggle('hidden',g.mode!=='cat'||!!d.duel);
  /* TWISTS — random remix so no level plays the same way twice */
- if(!g.vs&&!g.endless&&!custom&&!d.boss&&!d.max&&!d.duel&&!d.king&&!d.cboss&&!d.rescue&&!d.moonfair&&idx>0){
+ if(!g.vs&&!g.endless&&!custom&&!d.boss&&!d.max&&!d.duel&&!d.king&&!d.cboss&&!d.rescue&&!d.moonfair&&!d.storm&&!d.halloween&&idx>0){
  const chill=(save.diff==='chill');
     const TW=chill?['speedy','slippery','windy','none','none','none']:['swarm','speedy','critters','slippery','foggy','windy','none'];
     const tw=TW[Math.floor(Math.random()*TW.length)];
@@ -4139,6 +4315,7 @@ function startLevel(idx,custom){
     else if(tw==='windy'){g.wind={t:4,dir:0,active:0};toast('TWIST: WINDY! Hold on tight!',2800);}
  else g.twist=null;
  }
+ themeInit(g,idx);
  refreshBuildBar(); buildAbilityBar(); updateGoalBox();
  MUSIC.start(d.b,idx);
  toast(d.tip,3200);
@@ -4191,7 +4368,7 @@ function updateGoalBox(){
     if(g.level&&g.level.def&&g.level.def.parade)
       el.innerHTML=g.exitOpen?'HOME is OPEN — race in!':('Tickets: '+g.fishGot+'/3 · then HOME!');
     else
-      el.innerHTML=g.exitOpen?'The door is open — run home!':'<i class="ic-fish"></i> '+g.fishGot+' / 3 <span class="then">then the door</span>';
+      el.innerHTML=g.exitOpen?'The door is open — run home!':(g.level.biome.halloween?'Candy corn '+g.fishGot+' / 3 <span class="then">then the door</span>':'<i class="ic-fish"></i> '+g.fishGot+' / 3 <span class="then">then the door</span>');
   }else{
     const total=1+g.minions.filter(m=>m.kind==='cat'&&!m.caught).length;
     el.innerHTML=total>1?('Catch all '+total+' cats!'):'Catch the cat!';
@@ -4493,6 +4670,7 @@ function update(dt){
       }
     }
   }
+  if(g.storm||g.hal) themeUpdate(g,dt);
   /* bounce clouds: step on one and ZOOM */
   p.bounceCd=Math.max(0,(p.bounceCd||0)-dt);
   if(tileUnder(p)===T.BOUNCE&&p.bounceCd<=0){
@@ -4527,7 +4705,7 @@ function update(dt){
             toast('ALL FLOWERS! Now THROW them at the boss — SPACE or click!',3000);
           }else updateGoalBox();
         }}
-      else if(it.kind==='fish'&&p.kind==='cat'){it.taken=true;g.fishGot++;SFX.fish();poof(it.x,it.y,'#9ad0ff');addScore(25,it.x,it.y,'FISH');polFishPop(it.x,it.y);
+      else if(it.kind==='fish'&&p.kind==='cat'){it.taken=true;g.fishGot++;SFX.fish();poof(it.x,it.y,'#9ad0ff');addScore(25,it.x,it.y,g.level.biome.halloween?'CANDY':'FISH');polFishPop(it.x,it.y);
         if(g.vs&&vxIsFish()){VS.sc[0]++;it.resp=1.2;} else if(g.fishGot>=(g.vs&&VS.gm==='coop'?(VS.coopNeed||3):3)){g.exitOpen=true;SFX.open();toast(g.vs&&VS.gm==='coop'?'All the fish! The door is open. Both run home!':'The exit door is OPEN! Run!');ring(tcx(g.level.exit.c),tcx(g.level.exit.r),'#ffd93d');}
         updateGoalBox();}
       else if(it.kind==='heart'){it.taken=true;SFX.fish();poofBig(it.x,it.y,'#ff8fa5');
@@ -4855,6 +5033,7 @@ function endLevel(won,msg){
   if(won&&L.boss&&!g.zombie&&!g.mouse)toast('You unlocked the MAX LEVEL!',3000);
   document.getElementById('endStars').textContent=won?('*'.repeat(stars)+'-'.repeat(3-stars)):'...';
   polEndScreen(won,stars,g);
+  if(won&&!g.endless&&!g.donut&&!g.zombie&&!g.socks&&!g.mouse&&!g.dailyRun&&!g.customPlay) themeOnWin(g,stars);
   const goalLine=starGoalText();
   if(won&&g.dailyRun) markDailyCleared();
   if(won&&L&&L.parade&&!g.socks&&!g.mouse&&!g.donut&&!g.zombie&&!g.dailyRun) earnSticker('moonParade', 'Moon Parade sticker!');
@@ -5084,6 +5263,7 @@ function drawTileArt(t,c,r,x,y,bi,g,dyn){
     if(dyn&&(t===T.FENCE||t===T.CRATE)){ drawHP(c,r,x,y); return; }
     switch(t){
       case T.WALL:{
+        if(bi.halloween&&r>0&&(c*7+r*13)%13===0){ drawJackO(cx,x+TILE/2,y+TILE/2,.6,true); }
         if(bi.name==='Spider Grove'&&(c*7+r*13)%4===0){
           cx.strokeStyle='rgba(240,240,255,.5)'; cx.lineWidth=1.2;
           cx.beginPath();cx.arc(x+2,y+2,9,0,Math.PI/2);cx.stroke();
@@ -5092,11 +5272,16 @@ function drawTileArt(t,c,r,x,y,bi,g,dyn){
         }
         break;}
       case T.CRATE:{
+        if(bi.halloween){ drawJackO(cx,x+TILE/2,y+TILE/2+2,1.05,true); break; }
         cx.fillStyle='#c98b4b'; rr(x+3,y+3,TILE-6,TILE-6,6); cx.fill();
         cx.strokeStyle='#8a5a33'; cx.lineWidth=3; rr(x+3,y+3,TILE-6,TILE-6,6); cx.stroke();
         cx.beginPath();cx.moveTo(x+6,y+6);cx.lineTo(x+TILE-6,y+TILE-6);cx.moveTo(x+TILE-6,y+6);cx.lineTo(x+6,y+TILE-6);cx.stroke();
         break;}
       case T.BUSH: case T.BBUSH:{
+        if(bi.halloween){ /* pumpkin patch: leafy vines + two little pumpkins (still a hiding spot) */
+          cx.fillStyle='rgba(0,0,0,0.14)'; blob(x+TILE/2+1,y+TILE/2+8,14);
+          cx.fillStyle='#3f7d34'; blob(x+TILE/2,y+TILE/2+3,14); cx.fillStyle='#57a046'; blob(x+TILE/2-8,y+TILE/2-2,8); blob(x+TILE/2+9,y+TILE/2,7);
+          drawJackO(cx,x+TILE/2-6,y+TILE/2+4,.55,false); drawJackO(cx,x+TILE/2+8,y+TILE/2+7,.45,false); break; }
         cx.fillStyle='rgba(0,0,0,0.12)'; blob(x+TILE/2+1,y+TILE/2+8,14);
         const bg=cx.createRadialGradient(x+TILE/2-4,y+TILE/2-4,2,x+TILE/2,y+TILE/2+2,16);
         bg.addColorStop(0,'#6ed06f'); bg.addColorStop(1,'#2f8a38');
@@ -5197,6 +5382,7 @@ function drawTileArt(t,c,r,x,y,bi,g,dyn){
     }
 }
 function drawItemsAndRest(g,bi,grid,rdt){
+  if(g.storm) themeDrawItems(g);
   /* scent trail (visible when playing dog, or sniffing) */
   if(g.mode==='dog'||g.sniffT>0){
     for(const s of g.scent){
@@ -5226,7 +5412,7 @@ function drawItemsAndRest(g,bi,grid,rdt){
     }
     else if(it.kind==='flower')drawPickupFlower(cx,it.x,it.y+b);
     else if(it.kind==='heart')drawPickupHeart(cx,it.x,it.y+b);
-    else if(it.kind==='fish')drawPickupFish(cx,it.x,it.y+b);
+    else if(it.kind==='fish'){ if(bi.halloween) drawCandyCorn(cx,it.x,it.y+b); else drawPickupFish(cx,it.x,it.y+b); }
     else if(it.kind==='sticker')drawPickupSticker(cx,it.x,it.y+b);
     else if(it.kind==='ticket')drawPickupTicket(cx,it.x,it.y+b);
     else if(it.kind==='pu')vxDrawPU(cx,it,b);
@@ -5375,6 +5561,7 @@ function drawItemsAndRest(g,bi,grid,rdt){
   if(g.donut) drawDonutOverlay();
   if(g.zombie) drawZombieOverlay();
   if(g.mouse) drawMouseOverlay();
+  if(g.storm||g.hal) themeOverlay(g);
   /* sniff reveal: outline cat through everything */
   if(g.mode==='dog'&&g.sniffT>0&&!g.enemy.caught){
     cx.strokeStyle='rgba(80,190,90,.9)';cx.lineWidth=3;
@@ -5887,13 +6074,29 @@ window.__crAccessory=function(c,kind,skin){
     c.strokeStyle='#3b2e4a'; c.lineWidth=.8; c.beginPath(); c.moveTo(-6,2); c.lineTo(-3,4); c.lineTo(-6,6); c.stroke();
   }else if(skin==='candy'){
     c.fillStyle='#ff4d88'; c.beginPath(); c.arc(-4,-12,3,0,TAU); c.fill(); c.fillStyle='#fff'; c.beginPath(); c.arc(-4,-12,1.2,0,TAU); c.fill();
+  }else if(skin==='witch'){
+    c.save(); c.translate(-1,-9); c.scale(1.3,1.3); c.translate(1,9);
+    /* cute witch hat: tall bendy cone, orange band, wide brim */
+    c.fillStyle='#4a2f78'; c.beginPath(); c.ellipse(-1,-9,15,3.6,-.08,0,TAU); c.fill();
+    c.beginPath(); c.moveTo(-9,-10); c.quadraticCurveTo(-4,-22,2,-33); c.quadraticCurveTo(5,-36,9,-32); c.quadraticCurveTo(4,-30,4,-24); c.lineTo(8,-10); c.closePath(); c.fill();
+    c.fillStyle='#ff9a2e'; c.beginPath(); c.moveTo(-8.6,-12.5); c.lineTo(7.6,-12.5); c.lineTo(7.2,-15.5); c.lineTo(-7.6,-15.5); c.closePath(); c.fill();
+    c.fillStyle='#ffd93d'; c.beginPath(); c.arc(0,-14,1.5,0,TAU); c.fill();
+    c.restore();
+  }else if(skin==='pumpkin'){
+    c.save(); c.translate(-1,-8); c.scale(1.6,1.6); c.translate(1,8);
+    /* little pumpkin cap with a stem and leaf, plus an orange bandana */
+    c.fillStyle='#f08a24'; c.beginPath(); c.ellipse(-5,-11,6,4.6,0,0,TAU); c.ellipse(3,-11,6,4.6,0,0,TAU); c.ellipse(-1,-12,5.5,5.2,0,0,TAU); c.fill();
+    c.strokeStyle='rgba(150,70,10,.6)'; c.lineWidth=.9; c.beginPath(); c.moveTo(-3,-16); c.quadraticCurveTo(-4,-11,-3,-7); c.moveTo(1,-16); c.quadraticCurveTo(2,-11,1,-7); c.stroke();
+    c.fillStyle='#4f8a2e'; c.fillRect(-2,-20,2.4,4); c.beginPath(); c.ellipse(2.6,-18.6,3.2,1.6,-.5,0,TAU); c.fill();
+    c.restore();
+    c.fillStyle='#ff9a2e'; c.beginPath(); c.moveTo(-10,3); c.lineTo(10,3); c.lineTo(0,10); c.closePath(); c.fill();
   }else if(skin==='snow'){
     c.fillStyle='rgba(126,200,240,.85)'; c.beginPath(); c.moveTo(-10,-6); c.lineTo(8,-6); c.lineTo(6,-1); c.lineTo(-8,-1); c.closePath(); c.fill();
   }
 };
 /* Super cape behind the body (drawn before the animal) */
-function crCape(c,kind,p,moving){
-  c.fillStyle='#e63946'; const w=Math.sin(TAU*p)*6;
+function crCape(c,kind,p,moving,col){
+  c.fillStyle=col||'#e63946'; const w=Math.sin(TAU*p)*6;
   const k=kind==='dog'?1:.75;
   c.beginPath(); c.moveTo(30*k,-62*k); c.quadraticCurveTo(-20*k,-80*k+w,-62*k,-56*k+w*1.4); c.lineTo(-40*k,-44*k); c.quadraticCurveTo(0,-50*k,28*k,-50*k); c.closePath(); c.fill();
 }
@@ -5911,7 +6114,7 @@ function drawCat(ctx,x,y,face,anim,moving,skin){
   const p=((anim/Math.PI)%1+1)%1;
   const sc=CR_GAME_CAT, lod=sc*Math.abs(ctx.getTransform?ctx.getTransform().a:1);
   ctx.save(); ctx.translate(x,y+15); ctx.scale(face*sc,sc);
-  if(skin==='super') crCape(ctx,'cat',p,moving);
+  if(skin==='super'||skin==='witch') crCape(ctx,'cat',p,moving,skin==='witch'?'#5b3a8f':null);
   drawCatReal(ctx,p,moving,skin||'classic',lod,lod<.6?1.3:1);
   ctx.restore();
 }
@@ -6278,9 +6481,12 @@ const WORLDS=[
   {name:'World 10 — The Sewer',   from:38,to:41},
   {name:'World 11 — Puppy Rescue',from:42,to:44},
   {name:'World 12 — Moon Fair',   from:45,to:48},
+  {name:'World 13 — Storm Sky',   from:49,to:52},
+  {name:'World 14 — Pumpkin Night',from:53,to:56},
 ];
 function levelUnlocked(i){
   if(i>=16&&i<=22&&!save.gear.shield)return false;       // volcano needs the shield
+  if(i===49||i===53) return true;                         // Storm Sky + Pumpkin Night: open from the start
   if(i===23||i===27||i===30||i===32||i===35||i===38||i===42||i===45)return starsFor(game.mode,15)>0;   // bonus worlds after Candy Boss
   return i===0||starsFor(game.mode,i-1)>0;               // beat the previous level
 }
@@ -6292,7 +6498,7 @@ function levelStarGoalPreview(mode,i){
   if(L.king) return '3* beat the king';
   if(L.boss||L.cboss) return '3* beat the boss';
   if(L.max) return '3* beat MAX army';
-  if(mode==='cat') return '3* fish + star door';
+  if(mode==='cat') return L.halloween?'3* candy + star door':'3* fish + star door';
   return '3* catch fast';
 }
 function openLevels(){
@@ -6334,8 +6540,8 @@ function openLevels(){
 }
 /* ---- wardrobe ---- */
 const SKINS={
-  cat:[{id:'classic',name:'Tabby',price:0},{id:'pirate',name:'Pirate Cat',price:120},{id:'ninja',name:'Ninja Cat',price:250},{id:'snow',name:'Snowball',price:80},{id:'candy',name:'Candy Cat',price:180},{id:'super',name:'SUPER CAT',price:300}],
-  dog:[{id:'classic',name:'Buddy',price:0},{id:'snow',name:'Snowy',price:80},{id:'pirate',name:'Pirate Dog',price:120},{id:'robot',name:'Robo-Dog',price:120},{id:'candy',name:'Candy Dog',price:180},{id:'ninja',name:'Ninja Dog',price:250},{id:'super',name:'SUPER DOG',price:300}],
+  cat:[{id:'classic',name:'Tabby',price:0},{id:'pirate',name:'Pirate Cat',price:120},{id:'ninja',name:'Ninja Cat',price:250},{id:'snow',name:'Snowball',price:80},{id:'candy',name:'Candy Cat',price:180},{id:'witch',name:'Witch Tom',price:150},{id:'super',name:'SUPER CAT',price:300}],
+  dog:[{id:'classic',name:'Buddy',price:0},{id:'snow',name:'Snowy',price:80},{id:'pirate',name:'Pirate Dog',price:120},{id:'robot',name:'Robo-Dog',price:120},{id:'candy',name:'Candy Dog',price:180},{id:'pumpkin',name:'Pumpkin Paw',price:150},{id:'ninja',name:'Ninja Dog',price:250},{id:'super',name:'SUPER DOG',price:300}],
 };
 function openWardrobe(){
   for(const kind of['cat','dog']){
@@ -7526,6 +7732,7 @@ function polEntScale(){ const b=document.body.classList; return b.contains('tabl
 /* ---- ambient life per world (capped, allocation-free in steady state) ---- */
 function polAmbKind(bi){
   const n=bi.name;
+  if(bi.storm) return 'cloud'; if(bi.halloween) return 'firefly';
   if(bi.ice) return 'snow'; if(/Volcano/.test(n)) return 'ember'; if(bi.candy||/Moon/.test(n)) return 'sparkle';
   if(/Waterline|Laundry/.test(n)) return 'bubble'; if(/Night|Sewer|Zombie/.test(n)) return 'firefly';
   if(/Sky/.test(n)) return 'cloud'; if(/Forest|Spider|Park|City/.test(n)) return 'leafbug';
