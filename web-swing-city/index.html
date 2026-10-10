@@ -372,7 +372,8 @@
     { name: 'NIGHT CITY',       sky: 2, night: 1 },
     { name: 'RAINY DOCKS',      sky: 3, night: 0.45, rain: true, water: true },
     { name: 'ROOFTOP CARNIVAL', sky: 4, night: 0.8, carnival: true },
-    { name: 'SKYLINE BRIDGE',   sky: 5, night: 0.35, bridge: true, fireworks: true, storyOnly: true }   // round 7: Sky Parade (story only)
+    { name: 'SKYLINE BRIDGE',   sky: 5, night: 0.35, bridge: true, fireworks: true, storyOnly: true },  // round 7: Sky Parade (story only)
+    { name: 'SKY ISLANDS',      sky: 6, night: 0, islands: true, storyOnly: true }                      // round 10: bonus world
   ];
   var ENDLESS_ZONES = 5;   // Endless keeps cycling the first 5 zones
 
@@ -464,13 +465,50 @@
     { name: 'King of Spots',     zone: 4, goal: 'crab',   target: 1,   bonus: { stars: 20 },  enemies: ['drone', 'bird'], diff: 0.3, story: 'spotty', after: 'spottyAfter', boss: 'spotty' },
     { name: QN,                  zone: 3, goal: 'crab',   target: 1,   bonus: { stars: 20 },  enemies: ['drone', 'bird'], diff: 0.35, story: 'queen', after: 'queenAfter', boss: 'queen' },
     { name: 'Villain Team-Up',   zone: 2, goal: 'crab',   target: 1,   bonus: { stars: 25 },  enemies: ['drone', 'goon'], diff: 0.35, story: 'hulk', after: 'hulkAfter', boss: 'hulk',
-      buddy: [ROSA.heart.id, ROSA.sister.id, 'rocky-web'] }
+      buddy: [ROSA.heart.id, ROSA.sister.id, 'rocky-web'] },
+    // ---- round 10 BONUS WORLD: Sky Islands (levels 15-20). bosses: [...] = fight them one after another
+    { name: 'Cloud Hop',         zone: 6, goal: 'stars',  target: 40,  bonus: { time: 80 },   enemies: ['bird', 'drone'], diff: 0.35, story: 'skyIntro' },
+    { name: 'Catch ' + HN + '!', zone: 6, goal: 'reach',  target: 900, bonus: { time: 70 },   enemies: ['drone', 'bird', 'goon'], diff: 0.4, story: 'skyRace', after: 'skyRaceEnd', buddy: [ROSA.heart.id] },
+    { name: 'Island Rescue',     zone: 6, goal: 'rescue', target: 3,   bonus: { stars: 30 },  enemies: ['bird', 'goon', 'saw'], diff: 0.45, story: 'skyRescue', rescues: true, pets: true, bigbot: 5200 },
+    { name: 'Double Trouble',    zone: 6, goal: 'crab',   target: 2,   bonus: { stars: 20 },  enemies: ['drone', 'bird'], diff: 0.4, story: 'double', after: 'doubleAfter', bosses: ['spotty', 'queen'] },
+    { name: 'Boss Rush',         zone: 6, goal: 'crab',   target: 4,   bonus: { stars: 30 },  enemies: ['drone'], diff: 0.4, story: 'rush', bosses: ['crab', 'ovals', 'heart', 'hulk'] },
+    { name: 'Scribble King 2.0', zone: 6, goal: 'king',   target: 1,   bonus: { stars: 30 },  enemies: ['drone', 'bird', 'goon'], diff: 0.5, story: 'king2', after: 'king2End', kingHp: 1.6,
+      buddy: ['red', 'shadow', ROSA.sister.id, 'rocky-web'] }
   ];
+  var WORLD2 = 14;   // first Sky Islands level index
   // Sky Parade job sizes per difficulty (Easy is kid-fair)
   var PARADE = { easy: { rescue: 2, stars: 15 }, normal: { rescue: 2, stars: 25 }, hard: { rescue: 3, stars: 30 } };
 
   /* ---------- comic story cards: who talks and what they say ({hero} = your hero's name) ---------- */
   var STORIES = {
+    skyIntro: [
+      { who: 'mayor', text: 'Look up! Islands are floating over the city, and there\'s a rainbow!' },
+      { who: 'hero', text: 'Sky Islands! Time to hop from cloud to cloud and grab every star!' }
+    ],
+    skyRace: [
+      { who: 'rosa', text: 'I stole the rainbow\'s sparkle! Catch me if you can, slowpoke!' },
+      { who: 'hero', text: 'Race you to the end of the islands, ' + HN + '!' }
+    ],
+    skyRaceEnd: [{ who: 'rosa', text: 'Fine, FINE. Keep your sparkle. ...You\'re fast. I hate that.' }],
+    skyRescue: [{ who: 'citizen', text: 'Our pets floated away on the islands! Please bring them to the safe roofs!' }],
+    double: [
+      { who: 'spotty', text: 'Better watch out for the spots! I could spot you... from the SKY!' },
+      { who: 'queen', text: 'And I bring the crazy storm! Double trouble, little hero!' }
+    ],
+    doubleAfter: [{ who: 'hero', text: 'Spotted AND un-crazied. Two villains, one hero!' }],
+    rush: [
+      { who: 'king', text: 'I invited ALL my villain friends. One after another! Ha ha!' },
+      { who: 'hero', text: 'A BOSS RUSH? Bring it on!' }
+    ],
+    king2: [
+      { who: 'king', text: 'I am back! Scribble King 2.0: bigger, scribblier, and on a floating island!' },
+      { who: 'rocky', text: 'We\'re all here to cheer you on! Rock on!' },
+      { who: 'hero', text: 'Everyone together. Let\'s finish this!' }
+    ],
+    king2End: [
+      { who: 'king', text: 'Okay, okay... you win. Maybe I\'ll draw something NICE next time.' },
+      { who: 'mayor', text: 'The Sky Islands are safe! You are the greatest hero of Web Swing City!' }
+    ],
     intro: [
       { who: 'mayor', text: 'Help! The Scribble King is scribbling all over our city!' },
       { who: 'hero', text: 'Don\'t worry, Mayor. {hero} is on the case!' },
@@ -712,7 +750,7 @@
   function progressScore(k, raw) {
     if (raw == null || raw === '') return 0;
     try {
-      if (k === STORAGE_SAVE) { var s = JSON.parse(raw), n = 0, L = (s && s.levels) || {}; for (var i in L) n += (L[i] && L[i].done ? 10 : 0) + ((L[i] && L[i].stars) || 0); return n; }
+      if (k === STORAGE_SAVE) { var s = JSON.parse(raw), n = 0, L = (s && s.levels) || {}, RM = (s && s.remix) || {}; for (var i in L) n += (L[i] && L[i].done ? 10 : 0) + ((L[i] && L[i].stars) || 0); for (var j in RM) n += (RM[j] && RM[j].done ? 5 : 0) + ((RM[j] && RM[j].stars) || 0); return n; }
       if (k === STORAGE_SHOP) { var sh = JSON.parse(raw); return sh && sh.owned ? Object.keys(sh.owned).filter(function (q) { return sh.owned[q]; }).length : 0; }
       if (k === STORAGE_MEDALS) { var m = JSON.parse(raw); return m ? Object.keys(m).length : 0; }
       if (k === STORAGE_CUSTOM) { var c = JSON.parse(raw); return Array.isArray(c) ? c.length : 0; }
@@ -828,6 +866,14 @@
       var x = la[i] || {}, y = lb[i] || {};
       sm.levels[i] = { done: !!(x.done || y.done), stars: Math.max(x.stars || 0, y.stars || 0) };
     });
+    sm.remix = {}; var ra = sa.remix || {}, rb = sb.remix || {};   // round 10: remix stars, best of both
+    Object.keys(ra).concat(Object.keys(rb)).forEach(function (i) { var x = ra[i] || {}, y = rb[i] || {}; sm.remix[i] = { done: !!(x.done || y.done), stars: Math.max(x.stars || 0, y.stars || 0) }; });
+    var da = sa.daily || {}, db = sb.daily || {}, dm = {};   // daily: longest streak, best scores, latest day
+    dm.streak = Math.max(da.streak || 0, db.streak || 0); dm.allBest = Math.max(da.allBest || 0, db.allBest || 0);
+    dm.last = (da.last || '') > (db.last || '') ? da.last : db.last;
+    dm.bestDate = (da.bestDate || '') > (db.bestDate || '') ? da.bestDate : db.bestDate;
+    dm.todayBest = Math.max(da.bestDate === dm.bestDate ? da.todayBest || 0 : 0, db.bestDate === dm.bestDate ? db.todayBest || 0 : 0);
+    if (dm.last || dm.allBest) sm.daily = dm;
     ['tut', 'seen'].forEach(function (f) { sm[f] = {}; [sb[f] || {}, sa[f] || {}].forEach(function (o) { for (var k in o) if (o[k]) sm[f][k] = o[k]; }); });
     out[STORAGE_SAVE] = JSON.stringify(sm);
     var ha = pj(a[STORAGE_SHOP], {}), hb = pj(b[STORAGE_SHOP], {}), hm = { owned: {}, equip: {} };
@@ -1013,7 +1059,8 @@
     { top: '#070b26', mid: '#1b1f4a', bottom: '#3a2f6e', sun: 'rgba(235,240,255,0.95)', moon: true }, // night
     { top: '#2b3547', mid: '#55657a', bottom: '#93a2b0', sun: 'rgba(230,235,245,0.15)' },            // rainy docks
     { top: '#1c0d3f', mid: '#55207a', bottom: '#ff8ab3', sun: 'rgba(255,240,220,0.9)', moon: true }, // carnival
-    { top: '#3a3f9e', mid: '#ff8a5c', bottom: '#ffd36e', sun: 'rgba(255,214,110,0.95)' }             // golden hour (Skyline Bridge)
+    { top: '#3a3f9e', mid: '#ff8a5c', bottom: '#ffd36e', sun: 'rgba(255,214,110,0.95)' },            // golden hour (Skyline Bridge)
+    { top: '#5ec8ff', mid: '#b9e6ff', bottom: '#ffe3f4', sun: 'rgba(255,250,200,0.95)', rainbow: true }  // Sky Islands
   ];
   var skyCanvases = SKY_STYLES.map(function () { return document.createElement('canvas'); });
   function paintSky(c, st) {
@@ -1030,6 +1077,15 @@
       s.fillStyle = st.top; s.beginPath(); s.arc(screenW * 0.78 + r * 0.45, screenH * 0.2 - r * 0.2, r * 0.85, 0, 6.283); s.fill();
       s.fillStyle = '#ffffff';
       for (var i = 0; i < 70; i++) { var a = 0.3 + hash(i + 5) * 0.7; s.globalAlpha = a; s.fillRect(hash(i) * screenW, hash(i + 100) * screenH * 0.6, 2, 2); }
+      s.globalAlpha = 1;
+    }
+    if (st.rainbow) {   // Sky Islands: a big soft rainbow
+      var rc = ['#ff4d4d', '#ff9f1c', '#ffd23f', '#3ddc84', '#4f8bff', '#8b5cff'], rr = Math.max(screenW, screenH) * 0.55, rw = rr * 0.035;
+      s.globalAlpha = 0.45; s.lineWidth = rw;
+      rc.forEach(function (c, i) { s.strokeStyle = c; s.beginPath(); s.arc(screenW * 0.35, screenH * 0.95, rr - i * rw, Math.PI, 2 * Math.PI); s.stroke(); });
+      s.globalAlpha = 0.85; s.fillStyle = '#ffffff';
+      for (var q = 0; q < 7; q++) { var qx = hash(q + 40) * screenW, qy = screenH * (0.12 + hash(q + 60) * 0.4), qr = 18 + hash(q + 80) * 26;
+        s.beginPath(); s.arc(qx, qy, qr, 0, 6.283); s.arc(qx + qr, qy + 6, qr * 0.8, 0, 6.283); s.arc(qx - qr, qy + 8, qr * 0.7, 0, 6.283); s.fill(); }
       s.globalAlpha = 1;
     }
   }
@@ -1115,7 +1171,12 @@
     return false;
   }
 
-  function extendWorld(toX) {
+  function extendWorld(toX) {   // Daily Challenge: the city is built from the day's seed (same for everyone)
+    if (!game || !game.daily || !game.daily.rng) return extendWorldInner(toX);
+    var r0 = Math.random; Math.random = game.daily.rng;
+    try { return extendWorldInner(toX); } finally { Math.random = r0; }
+  }
+  function extendWorldInner(toX) {
     // an Infinity / runaway x here used to be able to loop forever (a real freeze); never build more than ~6000 ahead per call
     if (!isFinite(toX)) return;
     toX = Math.min(toX, Math.min(world.nextBuildingX, world.nextAnchorX, world.nextHazardX != null ? world.nextHazardX : Infinity) + 6000);
@@ -1405,7 +1466,7 @@
       var s = world.stars[i];
       if (Math.abs(s.x - hero.x) < R && Math.abs(s.y - hero.y) < R + 10) {
         world.stars.splice(i, 1);
-        hero.stars++;
+        hero.stars += mod('double') ? 2 : 1;
         hero.streak = hero.streakTime > 0 ? hero.streak + 1 : 1;
         hero.streakTime = 0.8;
         if (hero.streak === 5) say('stars');
@@ -1535,6 +1596,11 @@
       var b = world.buildings[i];
       if (hero.x + R * 0.6 < b.x || hero.x - R * 0.6 > b.x + b.w || hero.y + R < b.top) continue;
       if (prevY + R <= b.top + 4 && hero.vy >= 0) {
+        if (mod('bouncy') && hero.vy > 260 && !hero.climbing) {   // EVERYTHING IS BOUNCY
+          hero.y = b.top - R; hero.vy = -Math.min(1100, hero.vy * 0.78); hero.airborne = true; hero.squash = 1;
+          if (Math.random() < 0.3) popup(hero.x, hero.y - 50, 'BOING!', '#ff8ab3');
+          continue;
+        }
         if (hero.airborne || hero.vy > 300) hero.squash = 1;
         if (hero.vy > 650 && currentCharacter().smash) redSmash();
         if (hero.airborne && hero.vy > 520 && hero.vx > 260 && hero.roll <= 0 && !hero.flipping) {   // parkour roll
@@ -1736,7 +1802,7 @@
 
   function startFinalBoss() {
     var level = game.stats.bosses + 1;
-    var hp = DEBUG_BOSSHP || (FINAL_BOSS.hp + (level - 1) * 10);
+    var hp = DEBUG_BOSSHP || Math.round((FINAL_BOSS.hp + (level - 1) * 10) * (game.level && game.level.kingHp ? game.level.kingHp : 1));
     world.finalBoss = { x: cam.x + viewW + 400, y: cam.y + viewH * 0.2, size: 300, hp: hp, maxHp: hp, phase: 1, level: level,
                         t: 0, state: 'intro', stateT: 0, next: 2.2, attack: null, flash: 0, angles: {}, lostHeart: false, talkCool: 0, swipe: null };
     world.hazards = [];
@@ -2160,7 +2226,7 @@
           else synth.cancel();
         }
         var u = new SpeechSynthesisUtterance(q.line);
-        u.pitch = (q.voice && q.voice.pitch) || 1; u.rate = (q.voice && q.voice.rate) || 1; u.volume = 0.9;
+        u.pitch = Math.min(2, ((q.voice && q.voice.pitch) || 1) * (mod('silly') ? 1.7 : 1)); u.rate = (q.voice && q.voice.rate) || 1; u.volume = 0.9;
         u.onend = u.onerror = function () { speech.startedAt = 0; };
         synth.speak(u); speech.startedAt = t0;
       } catch (e) { speech.off = true; }
@@ -2258,6 +2324,7 @@
     if (game.state === 'levelEnd') { levelEndPress(px, py, tap); return; }
     if (game.state === 'settings') { settingsPress(px, py, tap); return; }
     if (game.state === 'credits') { game.state = 'settings'; sfx('select'); return; }
+    if (game.state === 'fun') { funPress(px, py); return; }
     if (game.state === 'shop') {
       var S = shopLayout();
       if (!tap || inRect(px, py, S.back)) { game.state = 'title'; sfx('select'); return; }
@@ -2357,8 +2424,8 @@
     if (saveUI.open) { if (e.code === 'Escape') closeSaveCode(); return; }
     if (game.state === 'maker') { if (e.code === 'Escape') closeMaker(); return; }   // let him type the name
     if (game.state === 'play' && game.tutorial && (WEB_KEYS[e.code] || e.code === 'Escape')) { e.preventDefault(); dismissTutorial(); return; }
-    if (e.code === 'Escape' && (game.state === 'map' || game.state === 'settings' || game.state === 'shop' || game.state === 'medals' || game.state === 'credits')) {
-      if (game.state === 'map' && game.mapSel >= 0) game.mapSel = -1; else game.state = game.state === 'credits' ? 'settings' : 'title';
+    if (e.code === 'Escape' && (game.state === 'map' || game.state === 'settings' || game.state === 'shop' || game.state === 'medals' || game.state === 'credits' || game.state === 'fun')) {
+      if (game.state === 'map' && game.mapSel >= 0) game.mapSel = -1; else game.state = game.state === 'credits' || game.state === 'fun' ? 'settings' : 'title';
       return;
     }
     if (e.code === 'Escape' && game.state === 'story') { endStory(); return; }
@@ -2477,6 +2544,7 @@
     var x = SX(b.x), y = SY(b.top);
     var w = b.w * scale, h = (GROUND_Y - b.top) * scale;
     if (x > screenW || x + w < 0) return;
+    if (zfx.islands > 0.5) { drawIsland(b, x, y, w, h); return; }   // Sky Islands: rooftops become floating islands
     var img = getImage(SPRITES.building);
     if (img) { ctx.drawImage(img, x, y, w, h); return; }
     ctx.fillStyle = b.color;
@@ -2510,9 +2578,27 @@
     }
   }
 
+  function drawIsland(b, x, y, w, h) {
+    var depth = Math.min(h, (120 + hash(b.seed) * 160) * scale), mx = x + w * (0.4 + hash(b.seed + 3) * 0.2);
+    var g = ctx.createLinearGradient(0, y, 0, y + depth);
+    g.addColorStop(0, '#9b6b43'); g.addColorStop(1, '#5a3b2a');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y + 8 * scale); ctx.lineTo(x + w, y + 8 * scale);
+    ctx.lineTo(x + w * 0.8, y + depth * 0.55); ctx.lineTo(mx, y + depth); ctx.lineTo(x + w * 0.18, y + depth * 0.5); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(40,25,15,0.6)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#4ccf6a'; roundRect(x - 4 * scale, y - 2 * scale, w + 8 * scale, 14 * scale, 7 * scale); ctx.fill();
+    ctx.fillStyle = '#2f9e4b'; for (var v = 0; v < 4; v++) { var vx = x + w * (0.15 + v * 0.22); ctx.fillRect(vx, y + 10 * scale, 3 * scale, (14 + hash(b.seed + v) * 30) * scale); }
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(mx, y + depth, 16 * scale, 0, 6.283); ctx.arc(mx + 18 * scale, y + depth - 4 * scale, 12 * scale, 0, 6.283); ctx.fill();
+  }
   function drawStreet() {
     var y = SY(GROUND_Y);
     if (y > screenH) return;
+    if (zfx.islands > 0.5) {   // a sea of clouds instead of the street
+      var cg = ctx.createLinearGradient(0, y - 60, 0, screenH); cg.addColorStop(0, 'rgba(255,255,255,0.0)'); cg.addColorStop(0.3, '#ffffff'); cg.addColorStop(1, '#e6dcff');
+      ctx.fillStyle = cg; ctx.fillRect(0, y - 60, screenW, screenH - y + 80);
+      ctx.fillStyle = '#ffffff';
+      for (var c = -1; c < screenW / 60 + 2; c++) { var px = c * 60 - ((cam.x * scale * 0.5) % 60); ctx.beginPath(); ctx.arc(px, y - 6 + Math.sin(c + game.time) * 4, 34, 0, 6.283); ctx.fill(); }
+      return;
+    }
     if (zfx.water > 0.5) { drawWater(y, game.time); return; }   // Rainy Docks: the street is the harbour
     ctx.fillStyle = '#2b2b33';
     ctx.fillRect(0, y, screenW, screenH - y + 20);
@@ -2726,7 +2812,7 @@
     }
     ctx.strokeStyle = 'rgba(180,210,255,0.55)'; ctx.lineWidth = Math.max(3, 5 * scale);
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(cx, cy, ax, ay); ctx.stroke();
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1.5, 2.2 * scale);
+    ctx.strokeStyle = mod('rainbow') ? 'hsl(' + Math.floor(game.time * 240 % 360) + ',100%,62%)' : '#ffffff'; ctx.lineWidth = Math.max(1.5, (mod('rainbow') ? 3.4 : 2.2) * scale);
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(cx, cy, ax, ay); ctx.stroke();
     if (k >= 1) {   // little web splat where it sticks
       ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
@@ -2913,6 +2999,7 @@
   }
 
   // Draw any character at screen (x,y), "height" pixels tall, rotated by angle.
+  var drawingHero = false;
   function drawCharacter(ch, x, y, height, angle, t, swing, run, palette, sx, sy) {
     ctx.save();
     ctx.translate(x, y);
@@ -2924,6 +3011,10 @@
       var h = height * (1 - bounce), w = height * img.naturalWidth / img.naturalHeight * (1 + bounce);
       if (w > height * 1.3) { h *= height * 1.3 / w; w = height * 1.3; }   // very wide drawings
       ctx.drawImage(img, -w / 2, -h / 2 - (run ? Math.abs(run) * height * 0.05 : 0), w, h);
+      if (drawingHero && mod('bighead')) {   // Big Head mode: the top of the drawing again, much bigger
+        var nw = img.naturalWidth, nh = img.naturalHeight, hk = 1.75;
+        ctx.drawImage(img, 0, 0, nw, nh * 0.4, -w * hk / 2, -h / 2 + h * 0.4 - h * 0.4 * hk, w * hk, h * 0.4 * hk);
+      }
     } else {
       var k = height / 72;
       ctx.scale(k, k);
@@ -2935,12 +3026,12 @@
   function drawHero(t) {
     if (hero.hurt > 0 && Math.floor(t * 16) % 2 === 0) return; // blink after a hit
     var ch = currentCharacter();
-    var size = (ch.size || TUNING.heroSize) * scale;
+    var size = (ch.size || TUNING.heroSize) * scale * heroSizeMod();
     drawTrail(t);
     var ang = (hero.climbing ? -0.3 * hero.climbSide : hero.angle) + hero.spin;
     if (hero.roll > 0) ang += (1 - hero.roll / 0.42) * Math.PI * 2;   // parkour roll
     // lift the picture so the feet sit at the bottom of the bump-circle (on the roof)
-    var lift = (ch.size || TUNING.heroSize) * 0.5 - TUNING.heroRadius;
+    var lift = (ch.size || TUNING.heroSize) * heroSizeMod() * 0.5 - TUNING.heroRadius;
     var x = SX(hero.x + Math.sin(ang) * lift), y = SY(hero.y - Math.cos(ang) * lift);
     var aura = equipped('aura');
     if (aura) {
@@ -2957,7 +3048,9 @@
     if (hero.onRoof && !hero.roll) { var br = Math.sin(hero.runPhase * 2) * 0.035; sx *= 1 + br; sy *= 1 - br; }   // running bounce
     var nh = ch.hearts ? 5 + Math.min(5, hero.combo) : 0;
     if (nh) drawLoveHearts(x, y, size, t, nh, 'back');
+    drawingHero = true;
     drawCharacter(ch, x, y, size, ang, t, hero.rope || hero.zip ? 1 : 0, hero.onRoof || hero.climbing ? Math.sin(hero.runPhase) : 0, suit && suit.value, sx, sy);
+    drawingHero = false;
     if (nh) drawLoveHearts(x, y, size, t, nh, 'front');
     drawPowerFx(x, y, size, t);
     if (hero.shield) {
@@ -3076,7 +3169,7 @@
       ctx.strokeStyle = '#7df9ff'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(R - s * 0.5 - maxHearts() * s * 1.15, T, s * 0.42, 0, 6.283); ctx.stroke();
     }
-    text(game.level ? 'Level ' + (game.levelIndex + 1) : 'Best ' + game.best, R, T + s * 1.25, s * 0.65, '#ffd23f', 'right', '700');
+    text(game.level ? 'Level ' + (game.levelIndex + 1) + (game.remix ? ' REMIX' : '') : game.daily ? 'DAILY: ' + dailyModName(game.daily.mod) + '  best ' + dailyInfo().best : 'Best ' + game.best, R, T + s * 1.25, s * 0.65, game.daily || game.remix ? '#ff9f1c' : '#ffd23f', 'right', '700');
     if (hero.carry) text('Carrying 1', R, T + s * 2.1, s * 0.55, '#3ddc84', 'right', '800');
     // pause button (top middle)
     var pb = pauseButtonRect();
@@ -3305,6 +3398,7 @@
       ['Bosses beaten', '' + (st.bosses + (st.crabs || 0))], ['Style points', '' + game.lastBonus]
     ];
     if (!game.level && st.rescued) rows.push(['Rescued', '' + st.rescued]);
+    if (game.daily) { var di = dailyInfo(); rows.unshift(['DAILY ' + game.daily.date, dailyModName(game.daily.mod)], ['Score / today\'s best', game.lastScore + ' / ' + di.best + (game.dailyNewBest ? '  NEW!' : '')], ['Streak', di.streak + (di.streak === 1 ? ' day' : ' days')]); rows.splice(6); }
     var y0 = top + big * 1.5, avail = O.again.y - y0 - 10;
     var cols = landscape ? 2 : 1, perCol = Math.ceil(rows.length / cols);
     var rh = Math.min(30, avail / (perCol + 3.2)), fs = Math.max(13, rh * 0.62);
@@ -3371,7 +3465,7 @@
   function render(t) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     zone = zoneAt(cam.x + viewW * 0.33);
-    zfx.rain = zoneHas(zone, 'rain'); zfx.water = zoneHas(zone, 'water'); zfx.carnival = zoneHas(zone, 'carnival'); zfx.bridge = zoneHas(zone, 'bridge');
+    zfx.rain = zoneHas(zone, 'rain'); zfx.water = zoneHas(zone, 'water'); zfx.carnival = zoneHas(zone, 'carnival'); zfx.bridge = zoneHas(zone, 'bridge'); zfx.islands = zoneHas(zone, 'islands');
     if (shakeT > 0) { sx0 = rand(-1, 1) * shakeAmp; sy0 = rand(-1, 1) * shakeAmp; } else { sx0 = sy0 = 0; }
     if (spx.wobble > 0) { var wa = Math.min(1, spx.wobble) * 16 * scale; sx0 += Math.sin(t * 6) * wa; sy0 += Math.cos(t * 4.3) * wa * 0.7; }   // Queen Crazy's CRAZY MODE
     drawBackground(t);
@@ -3409,6 +3503,7 @@
     else if (game.state === 'levelEnd') { drawLevelEnd(t); drawToast(); }
     else if (game.state === 'settings') drawSettings(t);
     else if (game.state === 'credits') drawCredits(t);
+    else if (game.state === 'fun') drawFun(t);
     else if (game.state === 'maker') { ctx.fillStyle = 'rgba(15,18,50,0.6)'; ctx.fillRect(0, 0, screenW, screenH); }
     else if (game.state === 'shop') drawShop(t);
     else if (game.state === 'medals') drawMedals();
@@ -3985,6 +4080,10 @@
     shake(0.5, 10); hitStop(0.12); sfx('victory'); buzz([60, 40, 60, 40, 120]);
     world.crab = null;
     world.nextCrabX = game.level ? Infinity : hero.x + TUNING.crabEvery;
+    if (game.level && game.level.bosses) {   // boss rush / double trouble: next boss please
+      game.bossesBeaten = (game.bossesBeaten || 0) + 1;
+      if (game.bossesBeaten < game.level.bosses.length) { game.crabBeaten = false; world.nextCrabX = hero.x + 1500; banner('NEXT BOSS: ' + (game.bossesBeaten + 1) + ' / ' + game.level.bosses.length, '#ffd23f'); }
+    }
     world.nextHazardX = hero.x + 1200;
     music.track = 'main';
   }
@@ -4523,6 +4622,62 @@
     if (b.webbed) return game.stats.webbed >= b.webbed;
     return false;
   }
+  /* ---------- round 10: modifiers, REMIX and DAILY CHALLENGE ---------- */
+  var BASE_GRAVITY = TUNING.gravity;
+  var FUN_MODS = [ { id: 'lowgrav', name: 'Low Gravity' }, { id: 'bighead', name: 'Big Head mode' }, { id: 'rainbow', name: 'Rainbow Webs' }, { id: 'silly', name: 'Silly Voices' } ];
+  var DAILY_MODS = [ { id: 'lowgrav', name: 'LOW GRAVITY' }, { id: 'giant', name: 'GIANT MODE' }, { id: 'tiny', name: 'TINY MODE' }, { id: 'double', name: 'DOUBLE STARS' }, { id: 'bouncy', name: 'EVERYTHING IS BOUNCY' } ];
+  function mod(id) { return !!((game.daily && game.daily.mod === id) || (save.fun && save.fun[id])); }
+  function heroSizeMod() { return mod('giant') ? 1.6 : mod('tiny') ? 0.6 : 1; }
+  function applyMods() {   // called by startGame
+    TUNING.gravity = BASE_GRAVITY * (mod('lowgrav') ? 0.62 : 1);
+    if (game.daily) { game.power = game.daily.power; game.daily.rng = mulberry32(game.daily.seed); }
+  }
+  function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function dayKey(off) { var d = new Date(Date.now() + (off || 0) * 86400000); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function strSeed(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function dailySetup(date) {   // same hero / power / modifier / city for everybody on this date
+    var r = mulberry32(strSeed('wsc-daily-' + date)), heroes = CHARACTERS.filter(function (c) { return !c.custom; });
+    return { date: date, seed: strSeed('wsc-city-' + date), hero: heroes[Math.floor(r() * heroes.length)].id,
+             power: POWERS[Math.floor(r() * POWERS.length)].id, mod: DAILY_MODS[Math.floor(r() * DAILY_MODS.length)].id };
+  }
+  function dailyModName(id) { for (var i = 0; i < DAILY_MODS.length; i++) if (DAILY_MODS[i].id === id) return DAILY_MODS[i].name; return id; }
+  function dailyInfo() { var d = save.daily || {}; var today = dayKey(); return { best: d.bestDate === today ? d.todayBest || 0 : 0, streak: d.last === today || d.last === dayKey(-1) ? d.streak || 0 : 0, allBest: d.allBest || 0, played: d.last === today }; }
+  function startDaily() {
+    var today = dayKey(), d = save.daily || {};
+    if (d.last !== today) { d.streak = d.last === dayKey(-1) ? (d.streak || 0) + 1 : 1; d.last = today; }
+    save.daily = d; writeSave();
+    endDaily();
+    game.daily = dailySetup(today); game.dailyPrevChar = game.character; game.character = game.daily.hero;
+    game.mode = 'endless'; game.level = null; game.levelIndex = -1; game.remix = false;
+    startGame();
+    banner('DAILY: ' + dailyModName(game.daily.mod), '#ffd23f');
+  }
+  function endDaily() { if (game.daily) { game.daily = null; if (game.dailyPrevChar) game.character = game.dailyPrevChar; game.dailyPrevChar = null; } }
+  function recordDaily(score) {
+    var d = save.daily || {}, today = dayKey();
+    if (d.bestDate !== today) { d.bestDate = today; d.todayBest = 0; }
+    var nb = score > (d.todayBest || 0);
+    d.todayBest = Math.max(d.todayBest || 0, score); d.allBest = Math.max(d.allBest || 0, score);
+    save.daily = d; writeSave(); mirrorNow();
+    return nb;
+  }
+  function remixLevel(L) {   // harder: night sky, faster, more and extra enemies, bigger targets
+    var R = {}; for (var k in L) R[k] = L[k];
+    R.remix = true; R.name = L.name + ' REMIX';
+    R.diff = Math.min(1, L.diff + 0.25); R.density = (L.density || 1) * 1.5;
+    R.enemies = (L.enemies || []).concat(['saw', 'bird']);
+    if (L.zone <= 1) R.zone = 2;   // day / sunset levels turn into night
+    if (L.goal === 'stars' || L.goal === 'web' || L.goal === 'reach') R.target = Math.ceil(L.target * 1.25);
+    if (L.kingHp || L.goal === 'king') R.kingHp = (L.kingHp || 1) * 1.3;
+    if (L.bigbot) R.bigbot = Math.max(2500, L.bigbot * 0.7);
+    return R;
+  }
+  function drawCrown(x, y, s) {
+    ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#8a5a00'; ctx.lineWidth = Math.max(1.5, s * 0.08);
+    ctx.beginPath(); ctx.moveTo(x - s, y + s * 0.5); ctx.lineTo(x - s, y - s * 0.3); ctx.lineTo(x - s * 0.5, y + s * 0.1); ctx.lineTo(x, y - s * 0.6);
+    ctx.lineTo(x + s * 0.5, y + s * 0.1); ctx.lineTo(x + s, y - s * 0.3); ctx.lineTo(x + s, y + s * 0.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(x, y + s * 0.15, s * 0.16, 0, 6.283); ctx.fill();
+  }
   function goalProgress() {
     var L = game.level;
     if (!L) return 0;
@@ -4531,7 +4686,7 @@
       case 'stars': return Math.min(L.target, hero.stars);
       case 'rescue': return Math.min(L.target, game.rescued);
       case 'web': return Math.min(L.target, game.stats.webbed);
-      case 'crab': return game.crabBeaten ? 1 : 0;
+      case 'crab': return L.bosses ? game.bossesBeaten || 0 : game.crabBeaten ? 1 : 0;
       case 'parade': var pq = paradeNeeds(); return (game.rescued >= pq.rescue ? 1 : 0) + (hero.stars >= pq.stars ? 1 : 0) + (game.bigbotDone ? 1 : 0);
       case 'king': return game.stats.bosses > 0 ? 1 : 0;
     }
@@ -4561,12 +4716,14 @@
     var i = game.levelIndex, L = game.level;
     game.bonusOk = game.bonusOk || bonusMet(L);   // stars grabbed during the victory lap count too
     var rating = 1 + (game.bonusOk ? 1 : 0) + (game.heartsLost === 0 ? 1 : 0);
-    var prev = save.levels[i] || { stars: 0 }, first = !prev.done;
-    save.levels[i] = { done: true, stars: Math.max(prev.stars || 0, rating) };
+    var rmx = !!game.remix, store0 = rmx ? (save.remix = save.remix || {}) : save.levels;
+    var prev = store0[i] || { stars: 0 }, first = !prev.done && !rmx;
+    store0[i] = { done: true, stars: Math.max(prev.stars || 0, rating) };
+    if (rmx && rating === 3) banner('GOLD CROWN!', '#ffd23f');
     writeSave();
     bank += hero.stars; saveShop();
     mirrorNow();   // level/star/unlock change: back up + mirror right away
-    game.result = { i: i, rating: rating, bonusOk: game.bonusOk, noHit: game.heartsLost === 0, stars: hero.stars,
+    game.result = { remix: rmx, i: i, rating: rating, bonusOk: game.bonusOk, noHit: game.heartsLost === 0, stars: hero.stars,
                     newPower: first && L.power ? L.power : null, unlocked: first && i + 1 < LEVELS.length ? i + 1 : -1 };
     if (rating === 3) medal('stars3');
     if (L.goal === 'king') medal('story');
@@ -4574,21 +4731,25 @@
     music.track = 'main'; world.bolts = []; hero.rope = null; hero.zip = null; input.held = false;
     sfx('medal');
   }
-  function playLevel(i, skipStory) {
+  function playLevel(i, skipStory, remix) {
     var L = LEVELS[i];
     if (!L) return;
-    var go = function () { game.mode = 'story'; game.levelIndex = i; game.level = L; startGame(); };
+    endDaily();
+    if (remix) skipStory = true;
+    var go = function () { game.mode = 'story'; game.levelIndex = i; game.remix = !!remix; game.level = remix ? remixLevel(L) : L; startGame(); if (remix) banner('REMIX!', '#ff4f9a'); };
     if (L.story && !skipStory && !save.seen[L.story]) showStory(L.story, go); else go();
   }
-  function startEndless() { game.mode = 'endless'; game.level = null; game.levelIndex = -1; startGame(); }
+  function startEndless() { endDaily(); game.remix = false; game.mode = 'endless'; game.level = null; game.levelIndex = -1; startGame(); }
   function toTitleScenery() {
+    endDaily();
     game.level = null;
     resetWorld(); resetHero(); extendWorld(viewW + 1600); updateCamera(0, true);
     particles = []; popups = []; talk.life = 0;
   }
-  function openMap() { toTitleScenery(); game.state = 'map'; game.mapSel = -1; sfx('select'); }
+  function openMap() { var at = game.levelIndex >= 0 ? game.levelIndex : unlockedCount() - 1; game.mapPage = at >= WORLD2 || (game.result && game.result.i === WORLD2 - 1 && game.result.unlocked === WORLD2) ? 1 : 0; toTitleScenery(); game.state = 'map'; game.mapSel = -1; sfx('select'); }
   function nextFromLevel() {
     var r = game.result, L = LEVELS[r.i];
+    if (r.remix) { openMap(); return; }
     if (L.after && !save.seen[L.after]) { showStory(L.after, openMap); return; }
     if (r.i + 1 < LEVELS.length) playLevel(r.i + 1); else openMap();
   }
@@ -4716,24 +4877,28 @@
   function mapLayout() {
     var top = safe.top + 8, bottom = screenH - safe.bottom - 8, left = safe.left + 8, right = screenW - safe.right - 8;
     var landscape = screenW > screenH, headH = Math.max(48, Math.min(64, (bottom - top) * 0.11));
-    var r = clamp(Math.min(screenW, screenH) * 0.06, 20, 34), n = LEVELS.length, nodes = [];
-    var aT = top + headH + r * 1.6, aB = bottom - r * 2.6, aL = left + r * 2.2, aR = right - r * 2.2;
+    var page = game.mapPage || 0, i0 = page ? WORLD2 : 0, i1 = page ? LEVELS.length : WORLD2;
+    var r = clamp(Math.min(screenW, screenH) * 0.06, 20, 34), n = i1 - i0, nodes = [];
+    var hasW2 = UNLOCK_ALL || unlockedCount() > WORLD2, ww = Math.min(190, screenW * 0.45);
+    var world = hasW2 ? { x: right - ww, y: top + headH + 4, w: ww, h: 36 } : null;
+    var aT = top + headH + r * 1.6 + (world ? 40 : 0), aB = bottom - r * 2.6, aL = left + r * 2.2, aR = right - r * 2.2;
     for (var i = 0; i < n; i++) {
       var f = i / (n - 1), x, y;
       if (landscape) { x = aL + f * (aR - aL); y = (aT + aB) / 2 + Math.sin(i * 1.4 + 0.5) * (aB - aT) * 0.36; }
       else { y = aB - f * (aB - aT); x = (aL + aR) / 2 + (i % 2 ? 1 : -1) * (aR - aL) * 0.26; }
-      nodes.push({ x: x, y: y, r: r });
+      nodes.push({ x: x, y: y, r: r, idx: i0 + i });
     }
     var bw = Math.min(120, screenW * 0.28);
-    return { top: top, headH: headH, nodes: nodes, landscape: landscape, back: { x: left, y: top, w: bw, h: headH * 0.82 } };
+    return { top: top, headH: headH, nodes: nodes, landscape: landscape, back: { x: left, y: top, w: bw, h: headH * 0.82 }, world: world, page: page };
   }
   function mapCardLayout() {
     var w = Math.min(screenW - 28, 400), h = Math.min(screenH - 24, 330), x = (screenW - w) / 2, y = (screenH - h) / 2;
     var bh = Math.max(46, Math.min(58, h * 0.17)), seen = game.mapSel >= 0 && LEVELS[game.mapSel].story && save.seen[LEVELS[game.mapSel].story];
-    var pw = seen ? (w - 40) * 0.6 : w * 0.6;
+    var done = game.mapSel >= 0 && save.levels[game.mapSel] && save.levels[game.mapSel].done;
+    var n = 1 + (seen ? 1 : 0) + (done ? 1 : 0), gap = 10, bw = n === 1 ? w * 0.6 : (w - 28 - gap * (n - 1)) / n, bx = n === 1 ? x + (w - bw) / 2 : x + 14, by = y + h - bh - 14;
+    var slot = function (k) { return { x: bx + k * (bw + gap), y: by, w: bw, h: bh }; };
     return { box: { x: x, y: y, w: w, h: h }, close: { x: x + w - 48, y: y + 8, w: 40, h: 40 },
-             play: { x: seen ? x + 14 : x + (w - pw) / 2, y: y + h - bh - 14, w: pw, h: bh },
-             story: seen ? { x: x + 26 + pw, y: y + h - bh - 14, w: w - 40 - pw, h: bh } : null };
+             play: slot(0), remix: done ? slot(1) : null, story: seen ? slot(done ? 2 : 1) : null };
   }
   function drawMap(t) {
     var M = mapLayout(), un = unlockedCount();
@@ -4741,8 +4906,8 @@
     g.addColorStop(0, 'rgba(20,24,60,0.92)'); g.addColorStop(1, 'rgba(40,30,80,0.92)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, screenW, screenH);
     // zone islands behind the nodes
-    M.nodes.forEach(function (nd, i) {
-      var Z = ZONES[LEVELS[i].zone], st = SKY_STYLES[Z.sky];
+    M.nodes.forEach(function (nd, j) {
+      var i = nd.idx, Z = ZONES[LEVELS[i].zone], st = SKY_STYLES[Z.sky];
       var gg = ctx.createRadialGradient(nd.x, nd.y, nd.r, nd.x, nd.y, nd.r * 3.2);
       gg.addColorStop(0, st.mid); gg.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.globalAlpha = 0.8; ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(nd.x, nd.y, nd.r * 3.2, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
@@ -4756,13 +4921,16 @@
     M.nodes.forEach(function (nd, i) { if (i === 0) ctx.moveTo(nd.x, nd.y); else { var p = M.nodes[i - 1]; ctx.quadraticCurveTo((p.x + nd.x) / 2 + (M.landscape ? 0 : (i % 2 ? 40 : -40)), (p.y + nd.y) / 2 + (M.landscape ? 30 : 0), nd.x, nd.y); } });
     ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
     // zone names (first level of each zone run)
-    M.nodes.forEach(function (nd, i) {
-      if (i > 0 && LEVELS[i - 1].zone === LEVELS[i].zone) return;
+    M.nodes.forEach(function (nd, j) {
+      var i = nd.idx;
+      if ((j > 0 && LEVELS[i - 1].zone === LEVELS[i].zone) || M.page) return;   // Sky Islands page: the title says it
       var curN = i === unlockedCount() - 1 && !(save.levels[i] && save.levels[i].done);   // hero stands here: label goes above him
       text(ZONES[LEVELS[i].zone].name, nd.x, nd.y - nd.r * (curN ? 3.55 : 1.75), Math.max(10, nd.r * 0.42), '#7df9ff', 'center', '800');
     });
     // level nodes
-    M.nodes.forEach(function (nd, i) {
+    M.nodes.forEach(function (nd, j) {
+      var i = nd.idx, rx = save.remix && save.remix[i];
+      if (rx && rx.done) { if (rx.stars >= 3) drawCrown(nd.x + nd.r * 0.95, nd.y - nd.r * 0.95, nd.r * 0.42); else { ctx.fillStyle = '#ff4f9a'; ctx.beginPath(); ctx.arc(nd.x + nd.r * 0.9, nd.y - nd.r * 0.9, nd.r * 0.28, 0, 6.283); ctx.fill(); } }
       var L = LEVELS[i], s = save.levels[i], locked = i >= un, cur = i === un - 1 && !(s && s.done);
       var pulse = cur ? 1 + 0.08 * Math.sin(t * 6) : 1;
       ctx.beginPath(); ctx.arc(nd.x, nd.y, nd.r * pulse, 0, 6.283);
@@ -4792,7 +4960,9 @@
     });
     button(M.back, 'BACK', '#4f8bff');
     var tl = M.back.x + M.back.w + 8, tr = screenW - safe.right - 114;
-    text('STORY MAP', (tl + tr) / 2, M.top + M.headH * 0.42, fitSize('STORY MAP', Math.min(30, screenW / 13), tr - tl), '#ffd23f');
+    var mt = M.page ? 'SKY ISLANDS' : 'STORY MAP';
+    text(mt, (tl + tr) / 2, M.top + M.headH * 0.42, fitSize(mt, Math.min(30, screenW / 13), tr - tl), M.page ? '#7df9ff' : '#ffd23f');
+    if (M.world) button(M.world, M.page ? '< THE CITY' : 'SKY ISLANDS >', M.page ? '#4f8bff' : '#3ddcd0');
     ctx.fillStyle = '#ffd23f'; starPath(screenW - safe.right - 92, M.top + M.headH * 0.42, 12, 5); ctx.fill();
     text(totalStars() + '/' + LEVELS.length * 3, screenW - safe.right - 74, M.top + M.headH * 0.42, 18, '#ffffff', 'left', '800');
     if (game.shopMsg && game.shopMsg.life > 0) text(game.shopMsg.text, screenW / 2, screenH - safe.bottom - 20, 16, '#ffd23f');
@@ -4823,7 +4993,14 @@
       text(rw, b.x + 60, ry + i * step + step / 2, rs, '#151a3a', 'left', '700');
     });
     button(C.play, 'PLAY!', '#3ddc84');
+    if (C.remix) button(C.remix, 'REMIX', '#ff4f9a');
     if (C.story) button(C.story, 'STORY', '#ff9f1c');
+    var rx = save.remix && save.remix[game.mapSel];
+    if (C.remix) {
+      text('REMIX', b.x + 16, b.y + 22, 13, '#ff4f9a', 'left', '900');
+      for (var q = 0; q < 3; q++) { ctx.fillStyle = rx && rx.stars > q ? '#ff4f9a' : '#e2e5ee'; starPath(b.x + 70 + q * 18, b.y + 22, 7, 3); ctx.fill(); }
+      if (rx && rx.stars >= 3) drawCrown(b.x + 140, b.y + 21, 10);
+    }
     button(C.close, 'X', '#ff3b3b');
   }
   function mapPress(px, py, tap) {
@@ -4831,15 +5008,17 @@
     if (game.mapSel >= 0) {
       var C = mapCardLayout(), i = game.mapSel;
       if (inRect(px, py, C.play)) { playLevel(i); return; }
+      if (C.remix && inRect(px, py, C.remix)) { playLevel(i, true, true); return; }
       if (C.story && inRect(px, py, C.story)) { showStory(LEVELS[i].story, function () { playLevel(i, true); }); return; }
       if (inRect(px, py, C.close) || !inRect(px, py, C.box)) { game.mapSel = -1; sfx('select'); }
       return;
     }
     var M = mapLayout();
     if (inRect(px, py, M.back)) { game.state = 'title'; sfx('select'); return; }
+    if (M.world && inRect(px, py, M.world)) { game.mapPage = M.page ? 0 : 1; sfx('select'); return; }
     var un = unlockedCount();
-    for (var k = 0; k < M.nodes.length; k++) {
-      var nd = M.nodes[k];
+    for (var q = 0; q < M.nodes.length; q++) {
+      var nd = M.nodes[q], k = nd.idx;
       if (Math.hypot(px - nd.x, py - nd.y) < nd.r * 1.5) {
         if (k < un) { game.mapSel = k; sfx('select'); }
         else { sfx('nope'); game.shopMsg = { text: 'Finish level ' + k + ' first!', life: 2 }; }
@@ -4859,8 +5038,10 @@
     ctx.fillStyle = 'rgba(15,18,50,0.8)'; ctx.fillRect(0, 0, screenW, screenH);
     var top = safe.top + 10, avail = O.next.y - top - 10;
     var big = Math.min(screenW / 11, avail / 9, 48);
-    text('LEVEL COMPLETE!', screenW / 2, top + big * 0.7, fitSize('LEVEL COMPLETE!', big, screenW - 30), '#3ddc84');
-    text(L.name, screenW / 2, top + big * 1.65, big * 0.55, '#ffd23f');
+    var ttl = r.remix ? 'REMIX COMPLETE!' : 'LEVEL COMPLETE!';
+    text(ttl, screenW / 2, top + big * 0.7, fitSize(ttl, big, screenW - 30), r.remix ? '#ff4f9a' : '#3ddc84');
+    text(L.name + (r.remix ? ' REMIX' : ''), screenW / 2, top + big * 1.65, fitSize(L.name + ' REMIX', big * 0.55, screenW - 30), '#ffd23f');
+    if (r.remix && r.rating === 3 && game.starsShown >= 3) drawCrown(screenW / 2, top + big * 2.25, big * 0.4);
     var sy = top + big * 3, sr = Math.min(big * 0.95, 44);
     for (var k = 0; k < 3; k++) {
       var shown = k < game.starsShown, sx = screenW / 2 + (k - 1) * sr * 2.3, popk = shown ? Math.min(1.25, 0.4 + (game.overTime - (0.5 + k * 0.45)) * 4) : 1;
@@ -4902,13 +5083,13 @@
 
   // ---- settings
   function settingsLayout() {
-    var cols = screenW > screenH * 1.25 && screenW >= 560 ? 2 : 1, rows = 8 / cols, room = storageWarning() ? 44 : 0;   // wide screens: 2 columns
+    var cols = screenW > screenH * 1.25 && screenW >= 560 ? 2 : 1, rows = Math.ceil(9 / cols), room = storageWarning() ? 44 : 0;   // wide screens: 2 columns
     var g = Math.min(12, screenH * 0.02), bw = cols === 2 ? Math.min(300, (screenW - safe.left - safe.right - 50) / 2) : Math.min(320, screenW * 0.82);
     var bh = Math.max(32, Math.min(56, screenH * 0.075, (screenH - safe.top - safe.bottom - 84 - room) / rows - g));
     var x = (screenW - bw * cols - 16 * (cols - 1)) / 2, y0 = Math.max(safe.top + 64, (screenH - room - (bh + g) * rows) / 2 + 20);
     function r(i) { return { x: x + (i % cols) * (bw + 16), y: y0 + Math.floor(i / cols) * (bh + g), w: bw, h: bh }; }
     var cw = Math.min(screenW - 30, 420), ch = Math.min(screenH - 30, 260), cx = (screenW - cw) / 2, cy = (screenH - ch) / 2, hb = (cw - 40) / 2;
-    return { sound: r(0), music: r(1), haptics: r(2), difficulty: r(3), savecode: r(4), credits: r(5), reset: r(6), back: r(7), card: { x: cx, y: cy, w: cw, h: ch },
+    return { sound: r(0), music: r(1), haptics: r(2), difficulty: r(3), savecode: r(4), credits: r(5), fun: r(6), reset: r(7), back: r(8), card: { x: cx, y: cy, w: cw, h: ch },
              yes: { x: cx + 14, y: cy + ch - bh - 14, w: hb, h: bh }, no: { x: cx + 26 + hb, y: cy + ch - bh - 14, w: hb, h: bh } };
   }
   function drawSettings(t) {
@@ -4924,6 +5105,8 @@
     if (dh && screenH >= 600) text(dh, screenW / 2, S.difficulty.y + S.difficulty.h + 2, 12, '#ffffff', 'center', '700');
     button(S.savecode, 'Save code (move progress)', '#3ddc84');
     button(S.credits, 'CREDITS', '#ff8ab3');
+    var nFun = FUN_MODS.filter(function (m) { return save.fun && save.fun[m.id]; }).length;
+    button(S.fun, 'Fun modifiers' + (nFun ? ' (' + nFun + ' on)' : ''), '#b14fff');
     button(S.reset, 'Reset progress', '#ff3b3b');
     button(S.back, 'BACK', '#4f8bff');
     var warn = storageWarning();
@@ -5010,6 +5193,27 @@
   }
   function closeSaveCode() { if (saveUI.el) saveUI.el.style.display = 'none'; saveUI.open = false; }
 
+  /* ---------- FUN MODIFIERS screen (Settings) ---------- */
+  function funLayout() {
+    var bw = Math.min(320, screenW * 0.82), bh = Math.max(40, Math.min(56, (screenH - safe.top - safe.bottom - 140) / 5 - 10)), g = 10;
+    var x = (screenW - bw) / 2, y0 = Math.max(safe.top + 90, (screenH - (bh + g) * 5) / 2 + 30);
+    var rows = FUN_MODS.map(function (m, i) { return { x: x, y: y0 + i * (bh + g), w: bw, h: bh, id: m.id }; });
+    return { rows: rows, back: { x: x, y: y0 + 4 * (bh + g) + 8, w: bw, h: bh } };
+  }
+  function drawFun(t) {
+    ctx.fillStyle = 'rgba(15,18,50,0.88)'; ctx.fillRect(0, 0, screenW, screenH);
+    var F = funLayout();
+    text('FUN MODIFIERS', screenW / 2, F.rows[0].y - 50, fitSize('FUN MODIFIERS', Math.min(36, screenW / 11), screenW - 30), '#ffd23f');
+    text('For free play (Endless & Story). Daily has its own!', screenW / 2, F.rows[0].y - 18, fitSize('For free play (Endless & Story). Daily has its own!', 14, screenW - 30), '#c9cfe0', 'center', '700');
+    F.rows.forEach(function (r, i) { var on = save.fun && save.fun[r.id]; button(r, FUN_MODS[i].name + ': ' + (on ? 'ON' : 'OFF'), on ? '#b14fff' : '#8a92a6'); });
+    button(F.back, 'BACK', '#4f8bff');
+  }
+  function funPress(px, py) {
+    var F = funLayout();
+    if (inRect(px, py, F.back)) { game.state = 'settings'; sfx('select'); return; }
+    F.rows.forEach(function (r) { if (inRect(px, py, r)) { save.fun = save.fun || {}; save.fun[r.id] = !save.fun[r.id]; writeSave(); sfx('select'); } });
+  }
+
   /* ---------- CREDITS: who drew what ---------- */
   var CREDITS = [
     { kid: 'Monte', color: '#4f8bff', items: [{ id: 'red' }, { id: 'shadow' }, { king: true, name: 'Scribble King' }, { id: VILLAINS.hulk.id }, { building: true, name: 'The buildings' }] },
@@ -5053,6 +5257,7 @@
     else if (inRect(px, py, S.difficulty)) cycleDifficulty();
     else if (inRect(px, py, S.reset)) { game.confirmReset = true; sfx('nope'); }
     else if (inRect(px, py, S.credits)) { game.state = 'credits'; sfx('select'); }
+    else if (inRect(px, py, S.fun)) { game.state = 'fun'; sfx('select'); }
     else if (inRect(px, py, S.savecode)) { sfx('select'); openSaveCode(); }
     else if (inRect(px, py, S.back)) { game.state = 'title'; sfx('select'); }
   }
@@ -5120,12 +5325,12 @@
     var ph = Math.max(36, Math.min(46, avail * 0.065)), pw = Math.min(340, W - 40);
     var power = { x: (screenW - pw) / 2, y: y, w: pw, h: ph };
     y += ph + avail * 0.025;
-    var bigH = Math.max(50, Math.min(70, avail * 0.1)), bigW = Math.min(230, (W - 36) / 2);
-    var story = { x: screenW / 2 - bigW - 6, y: y, w: bigW, h: bigH }, endless = { x: screenW / 2 + 6, y: y, w: bigW, h: bigH };
+    var bigH = Math.max(50, Math.min(70, avail * 0.1)), bigW = Math.min(200, (W - 36) / 3);
+    var story = { x: screenW / 2 - bigW * 1.5 - 8, y: y, w: bigW, h: bigH }, endless = { x: screenW / 2 - bigW / 2, y: y, w: bigW, h: bigH }, daily = { x: screenW / 2 + bigW / 2 + 8, y: y, w: bigW, h: bigH };
     y += bigH + avail * 0.025;
     var bh = Math.max(42, Math.min(52, avail * 0.075)), g2 = 8, bw = Math.min(150, (W - 24 - g2 * 3) / 4), bx0 = (screenW - (bw * 4 + g2 * 3)) / 2;
     function btn(k) { return { x: bx0 + k * (bw + g2), y: y, w: bw, h: bh }; }
-    return { top: top, titleH: titleH, cards: cards, prev: prev, next: next, power: power, story: story, endless: endless,
+    return { top: top, titleH: titleH, cards: cards, prev: prev, next: next, power: power, story: story, endless: endless, daily: daily,
              shop: btn(0), medals: btn(1), maker: btn(2), settings: btn(3), below: y + bh, bottom: bottom, pages: pages, page: page };
   }
   function drawTitle(t) {
@@ -5181,9 +5386,12 @@
     var pw = currentPower(), p = powerDef(pw), any = POWERS.some(function (q) { return powerUnlocked(q.id); });
     button(L.power, any ? 'POWER: ' + (p ? p.name : 'NONE') + '  (tap to change)' : 'POWERS: win Story levels!', p ? p.color : '#8a92a6', '#ffffff');
     if (p) drawPowerIcon(p.id, L.power.x + L.power.h * 0.55, L.power.y + L.power.h / 2, L.power.h * 0.36, t);
-    button(L.story, 'STORY  ' + totalStars() + '/' + LEVELS.length * 3, '#3ddc84');
+    button(L.story, 'STORY ' + totalStars() + '/' + LEVELS.length * 3, '#3ddc84');
     ctx.fillStyle = '#ffd23f'; starPath(L.story.x + L.story.w - 16, L.story.y + 14, 8, 3.5); ctx.fill();
     button(L.endless, 'ENDLESS', '#4f8bff');
+    var dI = dailyInfo();
+    button(L.daily, 'DAILY', '#ff9f1c');
+    if (dI.streak > 0) { ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(L.daily.x + L.daily.w - 12, L.daily.y + 12, 13, 0, 6.283); ctx.fill(); text('' + dI.streak, L.daily.x + L.daily.w - 12, L.daily.y + 13, 13, '#ffffff', 'center', '900'); }
     button(L.shop, 'SHOP ' + bank, '#ffd23f', '#ffffff');
     button(L.medals, 'MEDALS ' + medalCount() + '/' + MEDALS.length, '#ff9f1c');
     button(L.maker, 'HERO MAKER', '#ff3b3b');
@@ -5206,6 +5414,7 @@
     if (inRect(px, py, L.power)) { cyclePower(); return; }
     if (inRect(px, py, L.story)) { openMap(); return; }
     if (inRect(px, py, L.endless)) { startEndless(); return; }
+    if (inRect(px, py, L.daily)) { startDaily(); return; }
     if (inRect(px, py, L.shop)) { game.state = 'shop'; sfx('select'); return; }
     if (inRect(px, py, L.medals)) { game.state = 'medals'; sfx('select'); return; }
     if (inRect(px, py, L.maker)) { openMaker('hero'); return; }
@@ -6145,6 +6354,7 @@
     if (DEBUG_HH) return 'heart';
     if (DEBUG_SKIN && (SPECIAL_BOSSES[DEBUG_SKIN] || DEBUG_SKIN === 'ovals' || DEBUG_SKIN === 'heart')) return DEBUG_SKIN;
     if (DEBUG_OVALS) return 'ovals';
+    if (game.level && game.level.bosses) return game.level.bosses[Math.min(game.bossesBeaten || 0, game.level.bosses.length - 1)];
     if (game.level) return game.level.boss || 'crab';
     return ['crab', 'ovals', 'heart', 'spotty', 'queen', 'hulk'][(game.stats.crabs || 0) % 6];   // Endless takes turns
   }
@@ -6393,7 +6603,8 @@
     var L = game.level, startX = L ? 0 : DEBUG_START;
     game.power = currentPower();
     game.bigbotDone = false;
-    game.rescued = 0; game.heartsLost = 0; game.goalDone = false; game.endT = 0; game.crabBeaten = false; game.bonusOk = false;
+    game.rescued = 0; game.heartsLost = 0; game.goalDone = false; game.endT = 0; game.crabBeaten = false; game.bonusOk = false; game.bossesBeaten = 0;
+    applyMods();
     game.bossTalk = null; game.goalMsg = null;
     resetWorld(startX);
     resetHero(startX);
@@ -6434,8 +6645,11 @@
     world.bolts = [];
     hero.rope = null;
     hero.carry = null; hero.zip = null; hero.charging = false;
-    if (!game.level && game.lastScore > game.best) { game.best = game.lastScore; game.newBest = true; store(STORAGE_BEST, game.best); }
-    if (!game.level) ghostSaveIfBest();
+    if (game.daily) game.dailyNewBest = recordDaily(game.lastScore);
+    else {
+      if (!game.level && game.lastScore > game.best) { game.best = game.lastScore; game.newBest = true; store(STORAGE_BEST, game.best); }
+      if (!game.level) ghostSaveIfBest();
+    }
     bank += hero.stars; saveShop();          // stars go into the shop bank
     talk.cool = 0; say('over', true);
     burst(hero.x, hero.y, '#ff3b3b', 18);
@@ -6448,6 +6662,7 @@
 
   function update(dt) {
     var realDt = dt;
+    if (game.daily && (game.state === 'title' || game.state === 'map' || game.state === 'settings')) endDaily();
     game.time += dt;
     if (game.toast) game.toast.life -= dt;
     if (game.bossTalk) game.bossTalk.life -= dt;
@@ -6613,7 +6828,7 @@
     importSave: importSave, parseSaveCode: parseSaveCode, flushProgress: flushProgress, snapshot: snapshot, storageWarning: storageWarning,
     openSaveCode: openSaveCode, mergeSnapshots: mergeSnapshots, fullSnapshot: fullSnapshot, closeSaveCode: closeSaveCode, game: game, hero: hero, world: world, TUNING: TUNING, CHARACTERS: CHARACTERS,
     start: function () { if (DEBUG_LEVEL) playLevel(clamp(DEBUG_LEVEL - 1, 0, LEVELS.length - 1), true); else startEndless(); }, press: apiPress,
-    playLevel: playLevel, openMap: openMap, LEVELS: LEVELS, save: function () { return save; }, riff: riff, showStory: showStory, openMaker: openMaker, maker: maker,
+    playLevel: playLevel, openMap: openMap, startDaily: startDaily, dailySetup: dailySetup, LEVELS: LEVELS, save: function () { return save; }, riff: riff, showStory: showStory, openMaker: openMaker, maker: maker,
     usePower: usePower, spawnEnemy: spawnEnemy, startCrab: startCrab, mapLayout: apiLayout(mapLayout), mapCardLayout: apiLayout(mapCardLayout), levelEndLayout: apiLayout(levelEndLayout),
     settingsLayout: apiLayout(settingsLayout), citizens: function () { return world.citizens; }, goalProgress: goalProgress, powerButtonRect: apiLayout(powerButtonRect),
     startCharge: startCharge, releaseCharge: releaseCharge, POWERS: POWERS, storyLayout: apiLayout(storyLayout), dismissTutorial: dismissTutorial,
