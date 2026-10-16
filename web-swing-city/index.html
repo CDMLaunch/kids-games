@@ -2612,6 +2612,8 @@
     // hung on the old web forever. A new press with a still-active id means we missed its release: end it first.
     if (input.roles[id] !== undefined) pointerEnd({ pointerId: id, cancelable: false });
     if (e.pointerType === 'mouse') Object.keys(input.roles).forEach(function (k) { if (+k !== id) pointerEnd({ pointerId: +k, cancelable: false }); });   // one mouse = one pointer
+    if (kbd.open) { input.roles[id] = 'ui'; helpPress(x, y); return; }   // round 15: controls popup
+    if (helpButtonAt(x, y)) { input.roles[id] = 'ui'; openHelp(); return; }
     if (game.state === 'title' && canFullscreen() && inRect(x, y, fullscreenButtonRect())) { input.roles[id] = 'ui'; toggleFullscreen(); return; }
     if (game.state === 'play' && game.versus) {
       if (inRect(x, y, pauseButtonRect())) { input.roles[id] = 'ui'; pause(true); return; }
@@ -2671,6 +2673,12 @@
 
   var WEB_KEYS = { Space: 1, ArrowUp: 1, Enter: 1, KeyW: 1 };
   window.addEventListener('keydown', function (e) {
+    kbd.used = true;   // round 15: a keyboard is here (also on tablets) -> show the controls help
+    if (kbd.open) {   // controls popup: H / ? / Esc / Enter / Space close it
+      if (e.code === 'KeyH' || e.key === '?' || e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); if (!e.repeat) closeHelp(); }
+      return;
+    }
+    if ((e.code === 'KeyH' || e.key === '?') && !saveUI.open && game.state !== 'maker' && (game.state === 'play' || game.state === 'paused' || game.state === 'title' || game.state === 'map')) { e.preventDefault(); if (!e.repeat) openHelp(); return; }
     if (saveUI.open) { if (e.code === 'Escape') closeSaveCode(); return; }
     if (game.state === 'maker') { if (e.code === 'Escape') closeMaker(); return; }   // let him type the name
     if (game.state === 'play' && game.tutorial && (WEB_KEYS[e.code] || e.code === 'Escape')) { e.preventDefault(); dismissTutorial(); return; }
@@ -2683,11 +2691,13 @@
       var V2 = game.versus;
       if (e.code === 'Space' || e.code === 'KeyW') { e.preventDefault(); V2.p[0].held = true; return; }
       if (e.code === 'Enter' || e.code === 'ArrowUp') { e.preventDefault(); V2.p[1].held = true; return; }
-      if (e.code === 'KeyF') { if (!e.repeat) vsFire(0); return; }
-      if (e.code === 'KeyL') { if (!e.repeat) vsFire(1); return; }
+      if (e.code === 'KeyF' || e.code === 'KeyS') { e.preventDefault(); if (!e.repeat) vsFire(0); return; }
+      if (e.code === 'KeyL' || e.code === 'ArrowDown') { e.preventDefault(); if (!e.repeat) vsFire(1); return; }
+      if (e.code !== 'Escape' && e.code !== 'KeyP' && e.code !== 'KeyM') return;   // round 15: 1P keys do nothing in 2P (no clashes)
     }
     if (e.code === 'Escape' && (game.state === 'vsSetup' || game.state === 'vsEnd')) { endVersus(); game.state = 'title'; return; }
-    if (e.code === 'KeyZ' || e.code === 'KeyC') { if (!e.repeat) usePower(); return; }
+    if (e.code === 'KeyZ' || e.code === 'KeyC' || e.code === 'KeyK') { if (!e.repeat) usePower(); return; }
+    if (e.code === 'KeyR' && game.state === 'play') { if (!e.repeat) rescuePull(); return; }
     if (game.state === 'title' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
       var i = characterIndex() + (e.code === 'ArrowLeft' ? -1 : 1);
       selectCharacter(CHARACTERS[(i + CHARACTERS.length) % CHARACTERS.length].id);
@@ -2695,8 +2705,8 @@
     }
     if (e.code === 'Escape' || e.code === 'KeyP') { pause(game.state === 'play'); return; }
     if (e.code === 'KeyM') { setSound(!game.sound); return; }
-    if (e.code === 'KeyF' || e.code === 'KeyX') { if (!e.repeat) startCharge(); return; }
-    if (e.code === 'KeyG' && game.state === 'play' && canFly()) { if (!e.repeat) toggleFly(); return; }
+    if (e.code === 'KeyF' || e.code === 'KeyX' || e.code === 'KeyJ') { if (!e.repeat) startCharge(); return; }
+    if ((e.code === 'KeyG' || e.code === 'KeyL') && game.state === 'play' && canFly()) { if (!e.repeat) toggleFly(); return; }
     if (WEB_KEYS[e.code]) { e.preventDefault(); if (!e.repeat) press(); }
   });
   window.addEventListener('keyup', function (e) {
@@ -2704,9 +2714,9 @@
     if (game.versus) {
       if (e.code === 'Space' || e.code === 'KeyW') { game.versus.p[0].held = false; return; }
       if (e.code === 'Enter' || e.code === 'ArrowUp') { game.versus.p[1].held = false; return; }
-      if (e.code === 'KeyF' || e.code === 'KeyL') return;
+      if (e.code === 'KeyF' || e.code === 'KeyL' || e.code === 'KeyS' || e.code === 'ArrowDown') return;
     }
-    if (e.code === 'KeyF' || e.code === 'KeyX') { releaseCharge(); return; }
+    if (e.code === 'KeyF' || e.code === 'KeyX' || e.code === 'KeyJ') { releaseCharge(); return; }
     if (WEB_KEYS[e.code]) { e.preventDefault(); release(); }
   });
   document.addEventListener('visibilitychange', function () { if (document.hidden) autoPause(); else game.focusAt = performance.now(); });
@@ -3526,6 +3536,104 @@
     roundRect(x, y + 2, Math.max(4, w * f), 10, 5); ctx.fill();
   }
 
+  /* ---------- round 15: KEYBOARD CONTROLS popup ('? CONTROLS' button, H or ? key) ----------
+   * Shown on computers (fine pointer) or as soon as any key is pressed on a phone/tablet. Opening it pauses the game.
+   * First level start on a computer opens it automatically until "Don't show again" is ticked (save.kbdHelpOff). */
+  var kbd = { used: false, open: false, resume: false, auto: false };
+  function kbdShown() { return kbd.used || !coarsePointer(); }
+  function openHelp(auto) {
+    if (kbd.open) return;
+    if (game.state === 'play') { pause(true); kbd.resume = game.state === 'paused'; } else kbd.resume = false;
+    kbd.open = true; kbd.auto = !!auto; releaseAll(); sfx('select');
+  }
+  function closeHelp() {
+    if (!kbd.open) return;
+    kbd.open = false; sfx('select');
+    if (kbd.resume && game.state === 'paused') pause(false);
+    kbd.resume = false;
+  }
+  function helpCornerRect() {   // small "?" next to the in-game pause button
+    var pb = pauseButtonRect(); return { x: pb.x + pb.w + 10, y: pb.y, w: pb.h, h: pb.h };
+  }
+  function helpTitleRect() { return { x: safe.left + 10, y: safe.top + 10, w: Math.min(170, screenW * 0.3), h: 46 }; }
+  function helpPauseRect() { var w = Math.min(210, screenW * 0.42); return { x: screenW - safe.right - w - 12, y: safe.top + 12, w: w, h: 56 }; }
+  function helpButtonAt(x, y) {
+    if (!kbdShown() || kbd.open) return false;
+    if (game.state === 'title') return inRect(x, y, helpTitleRect());
+    if (game.state === 'paused') return inRect(x, y, helpPauseRect());
+    if (game.state === 'play' && !game.tutorial) return inRect(x, y, helpCornerRect());
+    return false;
+  }
+  var HELP_W = 660, HELP_H = 600;
+  function helpLayout() {
+    var k = Math.min(1.25, (screenW - 16) / HELP_W, (screenH - safe.top - safe.bottom - 16) / HELP_H);
+    var w = HELP_W * k, h = HELP_H * k, x = (screenW - w) / 2, y = Math.max(safe.top + 8, (screenH - h) / 2);
+    return { k: k, x: x, y: y, w: w, h: h, ok: { x: x + w - 200 * k, y: y + h - 64 * k, w: 180 * k, h: 50 * k }, dont: { x: x + 20 * k, y: y + h - 62 * k, w: 280 * k, h: 46 * k } };
+  }
+  function keyCap(label, x, y, k, hot) {   // a little keyboard key picture; returns its width
+    ctx.font = '900 ' + Math.round(17 * k) + 'px system-ui, sans-serif';
+    var w = Math.max(34 * k, ctx.measureText(label).width + 18 * k), h = 32 * k;
+    ctx.fillStyle = '#c9cfe0'; roundRect(x, y - h / 2 + 3 * k, w, h, 7 * k); ctx.fill();
+    ctx.fillStyle = hot ? '#ffd23f' : '#ffffff'; roundRect(x, y - h / 2, w, h - 2 * k, 7 * k); ctx.fill();
+    ctx.fillStyle = '#151a3a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, x + w / 2, y - 1 * k);
+    return w;
+  }
+  function helpRow(keys, what, x, y, k, color, dim) {
+    ctx.globalAlpha = dim ? 0.45 : 1;
+    var cx = x;
+    keys.forEach(function (kk, i) { if (i) { text('/', cx + 6 * k, y, 14 * k, '#c9cfe0', 'center', '800'); cx += 12 * k; } cx += keyCap(kk, cx, y, k, i === 0) + 2 * k; });
+    text(what, x + 190 * k, y, 16 * k, color || '#ffffff', 'left', '800');
+    ctx.globalAlpha = 1;
+  }
+  function drawHelp() {
+    var L = helpLayout(), k = L.k, x = L.x + 22 * k, y = L.y;
+    ctx.fillStyle = 'rgba(10,12,35,0.7)'; ctx.fillRect(0, 0, screenW, screenH);
+    ctx.fillStyle = 'rgba(30,36,90,0.97)'; roundRect(L.x, L.y, L.w, L.h, 18 * k); ctx.fill();
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3 * k; roundRect(L.x, L.y, L.w, L.h, 18 * k); ctx.stroke();
+    text('KEYBOARD CONTROLS', L.x + L.w / 2, y + 30 * k, 28 * k, '#ffd23f');
+    var ch = currentCharacter(), pw = game.power ? POWERS.filter(function (p) { return p.id === game.power; })[0] : null, fly = !!ch.fly;
+    var r = y + 72 * k, dy = 42 * k;
+    helpRow(['SPACE', 'W', '\u2191'], 'HOLD = swing web. Let go = fly!', x, r, k); r += dy;
+    helpRow(['J', 'F', 'X'], 'Shoot web (also saves people)', x, r, k); r += dy;
+    helpRow(['R'], 'Rescue pull: grab a person in need', x, r, k, '#7df9ff'); r += dy;
+    helpRow(['K', 'Z', 'C'], 'Hero power' + (pw ? ': ' + pw.name : ' (pick one on the title)'), x, r, k, '#b18cff', !pw && game.state !== 'title'); r += dy;
+    helpRow(['L', 'G'], fly ? 'FLY on / off (' + ch.name + ')' : 'Fly (Agent Ovals only)', x, r, k, '#3ddc84', !fly); r += dy;
+    helpRow(['P', 'ESC'], 'Pause', x, r, k); r += dy;
+    helpRow(['H', '?'], 'This help     M = sound on/off', x, r, k); r += dy * 0.95;
+    text('2 PLAYERS', L.x + L.w / 2, r, 20 * k, '#ff9f1c'); r += dy * 0.85;
+    text('PLAYER 1', x, r, 15 * k, '#ff3b3b', 'left', '900'); text('PLAYER 2', x + L.w / 2 - 10 * k, r, 15 * k, '#4f8bff', 'left', '900'); r += dy * 0.8;
+    var cx = x; cx += keyCap('W', cx, r, k, true) + 4 * k; cx += keyCap('SPACE', cx, r, k) + 6 * k; text('swing', cx, r, 15 * k, '#ffffff', 'left', '800');
+    cx = x + L.w / 2 - 10 * k; cx += keyCap('\u2191', cx, r, k, true) + 4 * k; cx += keyCap('ENTER', cx, r, k) + 6 * k; text('swing', cx, r, 15 * k, '#ffffff', 'left', '800'); r += dy;
+    cx = x; cx += keyCap('F', cx, r, k, true) + 4 * k; cx += keyCap('S', cx, r, k) + 6 * k; text('shoot / rescue', cx, r, 15 * k, '#ffffff', 'left', '800');
+    cx = x + L.w / 2 - 10 * k; cx += keyCap('L', cx, r, k, true) + 4 * k; cx += keyCap('\u2193', cx, r, k) + 6 * k; text('shoot / rescue', cx, r, 15 * k, '#ffffff', 'left', '800'); r += dy * 0.85;
+    text('Mouse works too: hold click = swing, FIRE / POWER / FLY buttons on screen.', L.x + L.w / 2, r, 13 * k, '#c9cfe0', 'center', '700');
+    var d = L.dont, on = !!save.kbdHelpOff;   // "don't show again" checkbox
+    ctx.fillStyle = on ? '#3ddc84' : '#ffffff'; roundRect(d.x, d.y + d.h / 2 - 13 * k, 26 * k, 26 * k, 5 * k); ctx.fill();
+    if (on) text('\u2713', d.x + 13 * k, d.y + d.h / 2, 20 * k, '#151a3a');
+    text('Don\'t show again', d.x + 36 * k, d.y + d.h / 2, 16 * k, '#ffffff', 'left', '800');
+    button(L.ok, 'GOT IT!', '#3ddc84');
+  }
+  function helpPress(x, y) {
+    var L = helpLayout();
+    if (inRect(x, y, L.dont)) { save.kbdHelpOff = !save.kbdHelpOff; writeSave(); sfx('select'); return; }
+    if (inRect(x, y, L.ok) || !inRect(x, y, L)) closeHelp();
+  }
+  function drawHelpButtons() {
+    if (kbd.open) { drawHelp(); return; }
+    if (!kbdShown()) return;
+    if (game.state === 'title') button(helpTitleRect(), '? CONTROLS', '#ff9f1c');
+    else if (game.state === 'paused') button(helpPauseRect(), '? CONTROLS', '#ff9f1c');
+    else if (game.state === 'play' && !game.tutorial) button(helpCornerRect(), '?', 'rgba(15,18,50,0.6)');
+  }
+  function maybeAutoHelp() {   // first level start on a computer
+    if (kbd.autoDone || save.kbdHelpOff || !kbdShown() || game.versus || game.state !== 'play') return;
+    kbd.autoDone = true; openHelp(true);
+  }
+  function rescuePull() {   // R: web-pull the nearest person in need
+    if (game.state !== 'play' || game.tutorial || hero.carry) { sfx('nope'); return; }
+    var pt = pullTarget(900);
+    if (pt && hero.fireCool <= 0) webPull(pt.c); else sfx('nope');
+  }
   function pauseButtonRect() {
     var d = Math.max(40, Math.min(52, screenW / 9));
     return { x: screenW / 2 - d / 2, y: 8 + safe.top, w: d, h: d };
@@ -3804,6 +3912,7 @@
     else { drawOver(t); drawToast(); }
     if (DEBUG) text(perf.frameMs.toFixed(1) + ' ms/frame  ' + perf.workMs.toFixed(2) + ' ms work', 10, screenH - 20 - safe.bottom, 14, '#7df9ff', 'left', '600');
     if (game.state === 'title') drawFullscreenButton();
+    drawHelpButtons();   // round 15
     drawSavedTick();
     endUI();
     // (round 9: the pointer is ALWAYS visible; hiding it while swinging made a stall look like a dead freeze)
@@ -6311,7 +6420,7 @@
     var rest = L.bottom - L.below;
     if (rest > 22) {
       var hint = (coarsePointer() ? 'Hold = swing   Let go = fly & flip   FIRE = web shooter'
-                                  : 'SPACE / click = swing   F = fire   Z = power   G = fly   Esc = pause') + '   Best: ' + game.best;
+                                  : 'SPACE = swing   J = shoot   K = power   L = fly   P = pause   H = help') + '   Best: ' + game.best;
       var sw = storageWarning(), hc = '#ffffff';
       if (sw && !storageState.file) { hint = !storageState.ok ? 'Heads up: progress can\'t save here (private browsing?)' : 'Heads up: storage is full, progress may not save'; hc = '#ffb347'; }   // gentle note (private browsing / storage full) instead of the hints
       text(hint, cx, L.below + Math.min(rest * 0.5, 24), fitSize(hint, Math.min(15, rest * 0.5), screenW - 24), hc, 'center', '600');
@@ -7586,6 +7695,7 @@
       game.goalMsg = { text: 'GOAL: ' + goalText(L), life: 5 };
     } else banner(ZONES[zoneAt(hero.x).cur].name, '#ffffff');
     if (!game.versus) announce(L ? 'Level start! Let\'s swing!' : 'Here we go!', 2);
+    if (L && !game.tutorial) setTimeout(maybeAutoHelp, 0);   // round 15: controls popup, first level on a computer
     say('start', true);
   }
 
@@ -7827,7 +7937,7 @@
     ghostRec: function () { return game.ghostRec; }, loadGhost: loadGhost, coach: function () { return game.coach; }, buddy: function () { return world.buddies; }, scale: function () { return scale; }, ui: function () { return UI; },
     toggleFly: toggleFly, FLY: FLY, HEARTB: HEARTB, bossSkin: bossSkin, EXTRA_HEROES: EXTRA_HEROES,
     STORIES: STORIES, startGame: startGame,
-    voice: VC, announce: announce, speak: speak, fx: fx, audio: function () { return audio; }, teamCarryCheck: teamCarryCheck, setVoices: setVoices, cycleVolume: cycleVolume, crowdCheer: crowdCheer, landThud: landThud, startVersus: startVersus, vsSel: vsSel, VS_MODES: VS_MODES, setHero: function (h) { hero = h; } };   // round 14 test hooks
+    voice: VC, announce: announce, speak: speak, fx: fx, audio: function () { return audio; }, teamCarryCheck: teamCarryCheck, setVoices: setVoices, cycleVolume: cycleVolume, crowdCheer: crowdCheer, landThud: landThud, startVersus: startVersus, vsSel: vsSel, VS_MODES: VS_MODES, setHero: function (h) { hero = h; }, kbd: kbd, openHelp: openHelp, closeHelp: closeHelp, helpLayout: apiLayout(helpLayout), helpTitleRect: apiLayout(helpTitleRect), helpPauseRect: apiLayout(helpPauseRect), helpCornerRect: apiLayout(helpCornerRect), save: function () { return save; } };   // round 14 test hooks
 })();
 
 </script>
