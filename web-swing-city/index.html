@@ -437,7 +437,11 @@
     { id: 'vschamp',  name: 'Champion',        desc: 'Win a best-of-3 series' },
     { id: 'vstag',    name: 'Tag Master',      desc: 'Win a game of TAG' },
     { id: 'webres',   name: 'Web Lifeline',    desc: 'Rescue someone with a web-pull' },
-    { id: 'longres',  name: 'Long Shot',       desc: 'Do a long-range web rescue' }
+    { id: 'longres',  name: 'Long Shot',       desc: 'Do a long-range web rescue' },
+    { id: 'vsteam',   name: 'Dream Team',      desc: 'Save 5 people in TEAM RESCUE' },
+    { id: 'rematch',  name: 'Rematch!',        desc: 'Beat a boss in Boss Rematch' },
+    { id: 'rematchg', name: 'Speed Slayer',    desc: 'Gold time in Boss Rematch' },
+    { id: 'tricks5',  name: 'Trickster',       desc: 'Land all 5 Swing Tricks' }
   );
 
   /* =====================================================================
@@ -476,7 +480,7 @@
     { name: 'Cloud Hop',         zone: 6, goal: 'stars',  target: 40,  bonus: { time: 80 },   enemies: ['bird', 'drone'], diff: 0.35, story: 'skyIntro' },
     { name: 'Catch ' + HN + '!', zone: 6, goal: 'reach',  target: 900, bonus: { time: 70 },   enemies: ['drone', 'bird', 'goon'], diff: 0.4, story: 'skyRace', after: 'skyRaceEnd', buddy: [ROSA.heart.id], buddyAhead: true },
     { name: 'Island Rescue',     zone: 6, goal: 'rescue', target: 3,   bonus: { stars: 30 },  enemies: ['bird', 'goon', 'saw'], diff: 0.45, story: 'skyRescue', rescues: true, pets: true, bigbot: 5200 },
-    { name: 'Double Trouble',    zone: 6, goal: 'crab',   target: 2,   bonus: { stars: 20 },  enemies: ['drone', 'bird'], diff: 0.4, story: 'double', after: 'doubleAfter', bosses: ['spotty', 'queen'], bossHp: 0.75, bossGap: 900 },
+    { name: 'Double Trouble',    zone: 6, goal: 'crab',   target: 2,   bonus: { stars: 20 },  enemies: ['drone', 'bird'], diff: 0.4, story: 'double', after: 'doubleAfter', bosses: ['spotty', 'queen'], bossHp: 0.6, bossGap: 800 },
     { name: 'Boss Rush',         zone: 6, goal: 'crab',   target: 4,   bonus: { stars: 30 },  enemies: ['drone'], diff: 0.4, story: 'rush', bosses: ['crab', 'ovals', 'heart', 'hulk'], bossHp: 0.45, bossGap: 700 },
     { name: 'Scribble King 2.0', zone: 6, goal: 'king',   target: 1,   bonus: { stars: 30 },  enemies: ['drone', 'bird', 'goon'], diff: 0.5, story: 'king2', after: 'king2End', kingHp: 1.6,
       buddy: ['red', 'shadow', ROSA.sister.id, 'rocky-web', ROSA.heart.id] }
@@ -756,7 +760,7 @@
   function progressScore(k, raw) {
     if (raw == null || raw === '') return 0;
     try {
-      if (k === STORAGE_SAVE) { var s = JSON.parse(raw), n = 0, L = (s && s.levels) || {}, RM = (s && s.remix) || {}; for (var i in L) n += (L[i] && L[i].done ? 10 : 0) + ((L[i] && L[i].stars) || 0); for (var j in RM) n += (RM[j] && RM[j].done ? 5 : 0) + ((RM[j] && RM[j].stars) || 0); return n; }
+      if (k === STORAGE_SAVE) { var s = JSON.parse(raw), n = 0, L = (s && s.levels) || {}, RM = (s && s.remix) || {}; for (var i in L) n += (L[i] && L[i].done ? 10 : 0) + ((L[i] && L[i].stars) || 0); for (var j in RM) n += (RM[j] && RM[j].done ? 5 : 0) + ((RM[j] && RM[j].stars) || 0); n += Object.keys((s && s.suits && s.suits.owned) || {}).length * 3; for (var q in (s && s.rematch) || {}) n += s.rematch[q].tier || 0; return n; }
       if (k === STORAGE_SHOP) { var sh = JSON.parse(raw); return sh && sh.owned ? Object.keys(sh.owned).filter(function (q) { return sh.owned[q]; }).length : 0; }
       if (k === STORAGE_MEDALS) { var m = JSON.parse(raw); return m ? Object.keys(m).length : 0; }
       if (k === STORAGE_CUSTOM) { var c = JSON.parse(raw); return Array.isArray(c) ? c.length : 0; }
@@ -872,6 +876,11 @@
       var x = la[i] || {}, y = lb[i] || {};
       sm.levels[i] = { done: !!(x.done || y.done), stars: Math.max(x.stars || 0, y.stars || 0) };
     });
+    var ua = sa.suits || {}, ub = sb.suits || {};   // round 13: suits, tricks, rematch, team best
+    sm.suits = { owned: Object.assign({}, ub.owned, ua.owned), on: Object.assign({}, ub.on, ua.on) };
+    sm.tricks = {}; [sa.tricks || {}, sb.tricks || {}].forEach(function (o) { for (var k in o) sm.tricks[k] = Math.max(sm.tricks[k] || 0, o[k] || 0); });
+    sm.rematch = {}; [sa.rematch || {}, sb.rematch || {}].forEach(function (o) { for (var k in o) { var c = sm.rematch[k] || {}, n = o[k] || {}; sm.rematch[k] = { best: c.best && n.best ? Math.min(c.best, n.best) : c.best || n.best, tier: Math.max(c.tier || 0, n.tier || 0) }; } });
+    sm.teamBest = Math.max(sa.teamBest || 0, sb.teamBest || 0);
     sm.remix = {}; var ra = sa.remix || {}, rb = sb.remix || {};   // round 10: remix stars, best of both
     Object.keys(ra).concat(Object.keys(rb)).forEach(function (i) { var x = ra[i] || {}, y = rb[i] || {}; sm.remix[i] = { done: !!(x.done || y.done), stars: Math.max(x.stars || 0, y.stars || 0) }; });
     var da = sa.daily || {}, db = sb.daily || {}, dm = {};   // daily: longest streak, best scores, latest day
@@ -1388,7 +1397,7 @@
       game.slowmo = TUNING.slowmo;
       game.stats.perfect++;
       if (game.stats.perfect >= 5) medal('perfect5');
-      trick(15, 'PERFECT!', '#3ddc84');
+      trick(15, 'PERFECT!', '#3ddc84'); hero.perfectAt = game.time;
       sfx('perfect');
       burst(hero.x, hero.y, '#3ddc84', 14);
     } else if (bigSwing) {
@@ -1420,6 +1429,8 @@
       var name = FLIP_NAMES[Math.min(n, FLIP_NAMES.length) - 1];
       trick(25 * n * (n + 1) / 2, name, '#ff9f1c');
       game.stats.bestFlip = Math.max(game.stats.bestFlip, n);
+      if (n >= 2 && Math.abs(hero.vx) > 700) doTrick('cork');
+      if (game.time - (hero.padAt || -9) < 2.5) doTrick('boing');
       medal('flip1'); if (n >= 2) medal('flip2'); if (n >= 3) medal('flip3');
       if (n >= 2) say('flip');
       sfx('trick');
@@ -1608,7 +1619,7 @@
       if (hero.x + R * 0.6 < b.x || hero.x - R * 0.6 > b.x + b.w || hero.y + R < b.top) continue;
       if (prevY + R <= b.top + 4 && hero.vy >= 0) {
         if (b.pad && !hero.climbing) {   // bounce pad: BOING up to the secret stars
-          hero.y = b.top - R; hero.vy = -1450; hero.airborne = true; hero.squash = 1; hero.rope = null;
+          hero.y = b.top - R; hero.vy = -1450; hero.airborne = true; hero.squash = 1; hero.rope = null; hero.padAt = game.time;
           popup(hero.x, hero.y - 50, 'BOING!', '#ff8ab3'); sfx('roll'); b.padT = 0.4;
           continue;
         }
@@ -1619,6 +1630,7 @@
         }
         if (hero.airborne || hero.vy > 300) hero.squash = 1;
         if (hero.vy > 650 && currentCharacter().smash) redSmash();
+        if (hero.airborne && hero.vy > 760) doTrick('land');
         if (hero.airborne && hero.vy > 520 && hero.vx > 260 && hero.roll <= 0 && !hero.flipping) {   // parkour roll
           hero.roll = 0.42; hero.vx = Math.max(hero.vx, 420);
           popup(hero.x, hero.y - 50, 'ROLL!', '#ffffff'); sfx('roll'); hero.bonus += 5;
@@ -1687,6 +1699,7 @@
     if (hero.fireCool > 0) return;
     if (hero.ammo < 1) { sfx('empty'); return; }
     hero.ammo -= 1; hero.fireCool = TUNING.fireCooldown;
+    if (game.time - (hero.perfectAt || -9) < 0.7) { hero.perfectAt = -9; doTrick('zipkick'); }
     var hd = heroHand(), best = null, bestD = 820;
     enemyTargets().forEach(function (t) {
       if (t.x < hero.x - 60) return;                       // only aim ahead (or right above)
@@ -2345,6 +2358,9 @@
     if (game.state === 'credits') { game.state = 'settings'; sfx('select'); return; }
     if (game.state === 'fun') { funPress(px, py); return; }
     if (game.state === 'vsSetup') { if (tap) vsSetupPress(px, py); else startVersus(); return; }
+    if (game.state === 'suitlab') { suitLabPress(px, py, tap); return; }
+    if (game.state === 'tricks') { game.state = 'settings'; sfx('select'); return; }
+    if (game.state === 'bosses') { bossesPress(px, py, tap); return; }
     if (game.state === 'vsEnd') { if (tap) vsEndPress(px, py); else if (game.overTime > 0.8) startVersus(); return; }
     if (game.state === 'shop') {
       var S = shopLayout();
@@ -2357,6 +2373,7 @@
       var P = pauseLayout();
       if (tap && inRect(px, py, P.sound)) { setSound(!game.sound); return; }
       if (tap && inRect(px, py, P.music)) { setMusic(!game.music); return; }
+      if (tap && inRect(px, py, P.snap)) { takePhoto(); return; }
       if (tap && inRect(px, py, P.quit)) { var wasStory = !!game.level; music.track = 'main'; toTitleScenery(); game.state = wasStory ? 'map' : 'title'; game.mapSel = -1; return; }
       if (tap && !inRect(px, py, P.resume) && performance.now() - (game.focusAt || 0) < 500) return;   // the click that re-focused the window doesn't resume
       pause(false);
@@ -2365,7 +2382,7 @@
     if (game.state === 'over') {
       if (game.overTime < 0.7) return;
       if (tap && inRect(px, py, overLayout().change)) { if (game.level) openMap(); else { game.state = 'title'; sfx('select'); } return; }
-      if (game.level) playLevel(game.levelIndex, true); else startGame();
+      if (game.level && game.level.rematch) startRematch(game.level.rematch); else if (game.level) playLevel(game.levelIndex, true); else startGame();
       return;
     }
     if (game.tutorial) { dismissTutorial(); return; }
@@ -2454,8 +2471,8 @@
     if (saveUI.open) { if (e.code === 'Escape') closeSaveCode(); return; }
     if (game.state === 'maker') { if (e.code === 'Escape') closeMaker(); return; }   // let him type the name
     if (game.state === 'play' && game.tutorial && (WEB_KEYS[e.code] || e.code === 'Escape')) { e.preventDefault(); dismissTutorial(); return; }
-    if (e.code === 'Escape' && (game.state === 'map' || game.state === 'settings' || game.state === 'shop' || game.state === 'medals' || game.state === 'credits' || game.state === 'fun')) {
-      if (game.state === 'map' && game.mapSel >= 0) game.mapSel = -1; else game.state = game.state === 'credits' || game.state === 'fun' ? 'settings' : 'title';
+    if (e.code === 'Escape' && (game.state === 'map' || game.state === 'settings' || game.state === 'shop' || game.state === 'medals' || game.state === 'credits' || game.state === 'fun' || game.state === 'suitlab' || game.state === 'tricks' || game.state === 'bosses')) {
+      if (game.state === 'map' && game.mapSel >= 0) game.mapSel = -1; else game.state = game.state === 'credits' || game.state === 'fun' || game.state === 'tricks' ? 'settings' : game.state === 'bosses' ? 'map' : 'title';
       return;
     }
     if (e.code === 'Escape' && game.state === 'story') { endStory(); return; }
@@ -3070,6 +3087,7 @@
     ctx.rotate(angle);
     if (sx) ctx.scale(sx, sy);
     var img = getImage(ch.file);
+    var sid = suitOf(ch.id); if (img && sid) img = suitImage(img, sid, ch.file);
     if (img) {
       var bounce = run ? Math.abs(run) * 0.04 : 0;          // little running hop
       var h = height * (1 - bounce), w = height * img.naturalWidth / img.naturalHeight * (1 + bounce);
@@ -3233,7 +3251,7 @@
       ctx.strokeStyle = '#7df9ff'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(R - s * 0.5 - maxHearts() * s * 1.15, T, s * 0.42, 0, 6.283); ctx.stroke();
     }
-    text(game.level ? 'Level ' + (game.levelIndex + 1) + (game.remix ? ' REMIX' : '') : game.daily ? 'DAILY: ' + dailyModName(game.daily.mod) + '  best ' + dailyInfo().best : 'Best ' + game.best, R, T + s * 1.25, s * 0.65, game.daily || game.remix ? '#ff9f1c' : '#ffd23f', 'right', '700');
+    text(game.level ? (game.level.rematch ? 'REMATCH ' + game.playTime.toFixed(1) + 's' : 'Level ' + (game.levelIndex + 1) + (game.remix ? ' REMIX' : '')) : game.daily ? 'DAILY: ' + dailyModName(game.daily.mod) + '  best ' + dailyInfo().best : 'Best ' + game.best, R, T + s * 1.25, s * 0.65, game.daily || game.remix ? '#ff9f1c' : '#ffd23f', 'right', '700');
     if (hero.carry) text('Carrying 1', R, T + s * 2.1, s * 0.55, '#3ddc84', 'right', '800');
     // pause button (top middle)
     var pb = pauseButtonRect();
@@ -3423,9 +3441,9 @@
   /* ---------- pause screen ---------- */
   function pauseLayout() {
     var bw = Math.min(260, screenW * 0.7), bh = Math.max(46, Math.min(60, screenH * 0.1)), cx = (screenW - bw) / 2, y = screenH * 0.42;
-    var g = Math.min(14, screenH * 0.025), rh = bh * 1.35; y = Math.min(y, screenH - safe.bottom - (bh + g) * 3 - rh - g);
+    var g = Math.min(14, screenH * 0.025), rh = bh * 1.35; bh = Math.min(bh, (screenH - safe.top - safe.bottom - 120) / 5.6); y = Math.min(y, screenH - safe.bottom - (bh + g) * 4 - rh - g);
     var rw = Math.min(320, screenW * 0.8);
-    return { resume: { x: (screenW - rw) / 2, y: y - (rh - bh) - g * 0.5, w: rw, h: rh }, sound: { x: cx, y: y + bh + g, w: bw, h: bh }, music: { x: cx, y: y + (bh + g) * 2, w: bw, h: bh }, quit: { x: cx, y: y + (bh + g) * 3, w: bw, h: bh } };
+    return { resume: { x: (screenW - rw) / 2, y: y - (rh - bh) - g * 0.5, w: rw, h: rh }, sound: { x: cx, y: y + bh + g, w: bw, h: bh }, music: { x: cx, y: y + (bh + g) * 2, w: bw, h: bh }, quit: { x: cx, y: y + (bh + g) * 3, w: bw, h: bh }, snap: { x: cx, y: y + (bh + g) * 4, w: bw, h: bh } };
   }
   function drawPause() {
     ctx.fillStyle = 'rgba(15,18,50,0.6)';
@@ -3436,6 +3454,7 @@
     button(P.sound, game.sound ? 'Sound: ON' : 'Sound: OFF', game.sound ? '#4f8bff' : '#8a92a6');
     button(P.music, game.music ? 'Music: ON' : 'Music: OFF', game.music ? '#4f8bff' : '#8a92a6');
     button(P.quit, 'Quit to menu', '#ff3b3b');
+    button(P.snap, 'PHOTO: SNAP!', '#ff9f1c');
   }
 
   /* ---------- results screen ---------- */
@@ -3549,7 +3568,7 @@
     if (game.versus) drawVsPickups(t);
     drawGhost(t);
     drawBuddy(t);
-    if (game.state === 'play' || game.state === 'paused' || game.state === 'levelEnd' || game.state === 'vsEnd' || (game.state === 'over' && game.overTime < 0.15)) vsEach(function (p, i) { drawHero(t); if (p) drawVsTags(p, i); });
+    if (game.state === 'play' || game.state === 'paused' || game.state === 'levelEnd' || game.state === 'vsEnd' || game.state === 'photo' || (game.state === 'over' && game.overTime < 0.15)) vsEach(function (p, i) { drawHero(t); if (p) drawVsTags(p, i); });
     drawLoveFx(t);
     drawWebBalls();
     drawBolts(t);
@@ -3571,6 +3590,9 @@
     else if (game.state === 'credits') drawCredits(t);
     else if (game.state === 'fun') drawFun(t);
     else if (game.state === 'vsSetup') drawVsSetup(t);
+    else if (game.state === 'suitlab') drawSuitLab(t);
+    else if (game.state === 'tricks') drawTricks(t);
+    else if (game.state === 'bosses') drawBosses(t);
     else if (game.state === 'vsEnd') drawVsEnd(t);
     else if (game.state === 'maker') { ctx.fillStyle = 'rgba(15,18,50,0.6)'; ctx.fillRect(0, 0, screenW, screenH); }
     else if (game.state === 'shop') drawShop(t);
@@ -4257,7 +4279,7 @@
    * RESCUES  - people and pets stuck on ledges or falling with umbrellas.
    *   Swing past to grab one, land on a roof with a green SAFE flag to drop them off.
    * =================================================================== */
-  function rescuesOn(x) { return game.level ? !!game.level.rescues : (DEBUG_RESCUE || x > TUNING.rescueFirst); }
+  function rescuesOn(x) { if (game.versus && game.versus.mode === 'team') return true; return game.level ? !!game.level.rescues : (DEBUG_RESCUE || x > TUNING.rescueFirst); }
   function citizenKind() {
     var pets = ['cat', 'dog', 'bunny'], people = ['kid', 'grandma', 'dude'];
     var list = game.level && game.level.pets ? pets : (Math.random() < 0.3 ? pets : people);
@@ -4273,7 +4295,7 @@
       if (Math.random() < 0.6) world.citizens.push({ kind: kind, x: b.x + b.w + 16, y: b.top + 44, state: 'ledge', ledge: true, t: Math.random() * 5, vy: 0 });
       else world.citizens.push({ kind: kind, x: b.x + b.w * 0.5 + 300, y: GROUND_Y - 700, state: 'wait', t: 0, vy: 0, umbrella: true });
       world.lastCitizenX = b.x;
-      world.nextCitizenX = b.x + (game.level ? rand(1000, 1500) : rand(TUNING.rescueEvery * 0.8, TUNING.rescueEvery * 1.2));   // round 12: rescue levels spawn people a bit more often
+      world.nextCitizenX = b.x + (game.level ? rand(1000, 1500) : game.versus && game.versus.mode === 'team' ? rand(650, 1000) : rand(TUNING.rescueEvery * 0.8, TUNING.rescueEvery * 1.2));   // round 12: rescue levels spawn people a bit more often
       world.safeCount = Math.min(world.safeCount, 1);
     }
   }
@@ -4348,6 +4370,7 @@
     var d = Math.hypot(c.x - hero.x, c.y - hero.y);
     c.state = 'pulled'; c.umbrella = false; c.pull = { owner: hero, t: 0, dur: clamp(d / 1400, 0.35, 0.7), x0: c.x, y0: c.y, dist: d, style: ropeStyle(currentCharacter()) };
     c.bubble = 'Whoa!'; c.bubbleT = 0.8; hero.fireCool = TUNING.fireCooldown;
+    if (hero.airborne && Math.hypot(hero.vx, hero.vy) > 750) doTrick('swingby');
     sfx('thwip'); sfx('shoot'); buzz(15);
     return true;
   }
@@ -4723,7 +4746,7 @@
     if (!(game.intro > 0) || !game.level) return;
     var a = Math.min(1, game.intro * 2), w = Math.min(screenW - 40, 460), h = 70, x = (screenW - w) / 2, y = safe.top + Math.max(118, screenH * 0.2);
     ctx.globalAlpha = a; roundRect(x, y, w, h, 16); ctx.fillStyle = 'rgba(15,18,50,0.85)'; ctx.fill(); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.stroke();
-    var t1 = 'LEVEL ' + (game.levelIndex + 1) + ': ' + game.level.name, t2 = 'GOAL: ' + goalText(game.level);
+    var t1 = game.level.rematch ? 'BOSS REMATCH (HARD): beat it fast!' : 'LEVEL ' + (game.levelIndex + 1) + ': ' + game.level.name, t2 = 'GOAL: ' + goalText(game.level);
     text(t1, screenW / 2, y + 22, fitSize(t1, 20, w - 20), '#ffd23f'); text(t2, screenW / 2, y + 50, fitSize(t2, 16, w - 20), '#ffffff', 'center', '800');
     ctx.globalAlpha = 1;
   }
@@ -4845,6 +4868,7 @@
     return n;
   }
   function finishLevel() {
+    if (game.level && game.level.rematch) { rematchDone(); return; }
     var i = game.levelIndex, L = game.level;
     game.bonusOk = game.bonusOk || bonusMet(L);   // stars grabbed during the victory lap count too
     var rating = 1 + (game.bonusOk ? 1 : 0) + (game.heartsLost === 0 ? 1 : 0);
@@ -5018,7 +5042,8 @@
     var r = clamp(Math.min(screenW, screenH) * 0.06, 20, 34), n = i1 - i0, nodes = [];
     var hasW2 = UNLOCK_ALL || unlockedCount() > WORLD2, ww = Math.min(190, screenW * 0.45);
     var world = hasW2 ? { x: right - ww, y: top + headH + 4, w: ww, h: 36 } : null;
-    var aT = top + headH + r * 1.6 + (world ? 40 : 0), aB = bottom - r * 2.6, aL = left + r * 2.2, aR = right - r * 2.2;
+    var bossB = REMATCH.some(rematchOpen) ? { x: left, y: top + headH + 4, w: Math.min(190, screenW * 0.42), h: 36 } : null;
+    var aT = top + headH + r * 1.6 + (world || bossB ? 40 : 0), aB = bottom - r * 2.6, aL = left + r * 2.2, aR = right - r * 2.2;
     for (var i = 0; i < n; i++) {
       var f = i / (n - 1), x, y;
       if (landscape) { x = aL + f * (aR - aL); y = (aT + aB) / 2 + Math.sin(i * 1.4 + 0.5) * (aB - aT) * 0.36; }
@@ -5026,7 +5051,7 @@
       nodes.push({ x: x, y: y, r: r, idx: i0 + i });
     }
     var bw = Math.min(120, screenW * 0.28);
-    return { top: top, headH: headH, nodes: nodes, landscape: landscape, back: { x: left, y: top, w: bw, h: headH * 0.82 }, world: world, page: page };
+    return { top: top, headH: headH, nodes: nodes, landscape: landscape, back: { x: left, y: top, w: bw, h: headH * 0.82 }, world: world, bossB: bossB, page: page };
   }
   function mapCardLayout() {
     var w = Math.min(screenW - 28, 400), h = Math.min(screenH - 24, 330), x = (screenW - w) / 2, y = (screenH - h) / 2;
@@ -5100,6 +5125,7 @@
     var mt = M.page ? 'SKY ISLANDS' : 'STORY MAP';
     text(mt, (tl + tr) / 2, M.top + M.headH * 0.42, fitSize(mt, Math.min(30, screenW / 13), tr - tl), M.page ? '#7df9ff' : '#ffd23f');
     if (M.world) button(M.world, M.page ? '< THE CITY' : 'SKY ISLANDS >', M.page ? '#4f8bff' : '#3ddcd0');
+    if (M.bossB) button(M.bossB, 'BOSS REMATCH', '#ff3b3b');
     ctx.fillStyle = '#ffd23f'; starPath(screenW - safe.right - 92, M.top + M.headH * 0.42, 12, 5); ctx.fill();
     text(totalStars() + '/' + LEVELS.length * 3, screenW - safe.right - 74, M.top + M.headH * 0.42, 18, '#ffffff', 'left', '800');
     if (game.shopMsg && game.shopMsg.life > 0) text(game.shopMsg.text, screenW / 2, screenH - safe.bottom - 20, 16, '#ffd23f');
@@ -5153,6 +5179,7 @@
     var M = mapLayout();
     if (inRect(px, py, M.back)) { game.state = 'title'; sfx('select'); return; }
     if (M.world && inRect(px, py, M.world)) { game.mapPage = M.page ? 0 : 1; sfx('select'); return; }
+    if (M.bossB && inRect(px, py, M.bossB)) { game.state = 'bosses'; game.rematchMsg = null; sfx('select'); return; }
     var un = unlockedCount();
     for (var q = 0; q < M.nodes.length; q++) {
       var nd = M.nodes[q], k = nd.idx;
@@ -5224,13 +5251,13 @@
 
   // ---- settings
   function settingsLayout() {
-    var cols = screenW > screenH * 1.25 && screenW >= 560 ? 2 : 1, rows = Math.ceil(9 / cols), room = storageWarning() ? 44 : 0;   // wide screens: 2 columns
+    var cols = screenW > screenH * 1.25 && screenW >= 560 ? 2 : 1, rows = Math.ceil(10 / cols), room = storageWarning() ? 44 : 0;   // wide screens: 2 columns
     var g = Math.min(12, screenH * 0.02), bw = cols === 2 ? Math.min(300, (screenW - safe.left - safe.right - 50) / 2) : Math.min(320, screenW * 0.82);
     var bh = Math.max(32, Math.min(56, screenH * 0.075, (screenH - safe.top - safe.bottom - 84 - room) / rows - g));
     var x = (screenW - bw * cols - 16 * (cols - 1)) / 2, y0 = Math.max(safe.top + 64, (screenH - room - (bh + g) * rows) / 2 + 20);
     function r(i) { return { x: x + (i % cols) * (bw + 16), y: y0 + Math.floor(i / cols) * (bh + g), w: bw, h: bh }; }
     var cw = Math.min(screenW - 30, 420), ch = Math.min(screenH - 30, 260), cx = (screenW - cw) / 2, cy = (screenH - ch) / 2, hb = (cw - 40) / 2;
-    return { sound: r(0), music: r(1), haptics: r(2), difficulty: r(3), savecode: r(4), credits: r(5), fun: r(6), reset: r(7), back: r(8), card: { x: cx, y: cy, w: cw, h: ch },
+    return { sound: r(0), music: r(1), haptics: r(2), difficulty: r(3), savecode: r(4), credits: r(5), fun: r(6), tricks: r(7), reset: r(8), back: r(9), card: { x: cx, y: cy, w: cw, h: ch },
              yes: { x: cx + 14, y: cy + ch - bh - 14, w: hb, h: bh }, no: { x: cx + 26 + hb, y: cy + ch - bh - 14, w: hb, h: bh } };
   }
   function drawSettings(t) {
@@ -5248,6 +5275,7 @@
     button(S.credits, 'CREDITS', '#ff8ab3');
     var nFun = FUN_MODS.filter(function (m) { return save.fun && save.fun[m.id]; }).length;
     button(S.fun, 'Fun modifiers' + (nFun ? ' (' + nFun + ' on)' : ''), '#b14fff');
+    button(S.tricks, 'Swing Tricks list', '#ff9f1c');
     button(S.reset, 'Reset progress', '#ff3b3b');
     button(S.back, 'BACK', '#4f8bff');
     var warn = storageWarning();
@@ -5338,11 +5366,13 @@
   var VS_MODES = [ { id: 'race', name: 'RACE', info: 'First to 800 m (or furthest in 90 s)' },
                    { id: 'stars', name: 'STAR BATTLE', info: 'Most stars in 90 s. Rescue people for +3!' },
                    { id: 'wars', name: 'WEB WARS', info: 'Web your rival to stun them. Stars + 5 per hit' },
-                   { id: 'tag', name: 'TAG', info: 'Whoever is IT must web the other. Least time IT wins!' } ];
+                   { id: 'tag', name: 'TAG', info: 'Whoever is IT must web the other. Least time IT wins!' },
+                   { id: 'team', name: 'TEAM RESCUE', info: 'Co-op! Save as many people as you can in 2 minutes' } ];
   var VS_HOWTO = {
     race:  ['Swing as far as you can!', 'First to 800 m wins (or furthest after 90 s).', 'Grab a PORTAL to swap places, SLOW to goo your rival.'],
     stars: ['Grab the most stars in 90 s.', 'FIRE at people in need: rescues give +3.', 'Steal a rescue by webbing them first!'],
     wars:  ['FIRE webs at your rival to stun them.', '+5 per hit, stars count too.', 'After a hit you are safe for 2 s.'],
+    team:  ['Work TOGETHER: save people from the Scribble King\'s minions!', 'FIRE at people to web-pull them, drop them on SAFE roofs.', 'Rescue = 10 points, star = 1. Beat your team high score!'],
     tag:   ['The one who is IT has a red glow.', 'IT: FIRE a web at the other player to pass it on.', 'Least time IT after 60 s wins!']
   };
   var VS_COLORS = ['#ff3b3b', '#4f8bff'], VS_TIME = 90, VS_RACE = 800;
@@ -5352,7 +5382,7 @@
   function openVersus() { endDaily(); vsSel.p[0] = vsChar(0); vsSel.p[1] = vsChar(1); game.state = 'vsSetup'; sfx('select'); }
   function vsLayout() {
     var top = safe.top + 10, W = screenW - safe.left - safe.right, landscape = screenW > screenH;
-    var mh = Math.max(40, Math.min(54, screenH * 0.07)), mw = Math.min(200, (W - 50) / 4), mx = (screenW - (mw * 4 + 30)) / 2, my = top + 54;
+    var mh = Math.max(40, Math.min(54, screenH * 0.07)), mw = Math.min(190, (W - 60) / 5), mx = (screenW - (mw * 5 + 40)) / 2, my = top + 54;
     var modes = VS_MODES.map(function (m, i) { return { x: mx + i * (mw + 10), y: my, w: mw, h: mh }; });
     var py = my + mh + 40, ph = Math.max(150, Math.min(300, screenH - py - 150)), pw = Math.min(300, (W - 50) / 2);
     var panels = [0, 1].map(function (i) { var x = screenW / 2 + (i ? 10 : -10 - pw); return { x: x, y: py, w: pw, h: ph, prev: { x: x + 4, y: py + ph / 2 - 26, w: 44, h: 52 }, next: { x: x + pw - 48, y: py + ph / 2 - 26, w: 44, h: 52 } }; });
@@ -5403,12 +5433,13 @@
     game.power = null; game.tutorial = null; game.coach = null; game.ghost = null; game.ghostRec = null;
     var h1 = hero, h2 = cloneHero(hero);   // same start line: no spawn advantage
     var vm = VS_MODES[vsSel.mode].id;
-    game.versus = { mode: vm, t: vm === 'tag' ? 60 : VS_TIME, count: 4.4, it: Math.random() < 0.5 ? 0 : 1, itT: [0, 0], immune: 0, pickX: 1400, pk: [], prevChar: prevChar, lead: -1, tauntT: 0,
+    game.versus = { mode: vm, t: vm === 'tag' ? 60 : vm === 'team' ? 120 : VS_TIME, count: 4.4, it: Math.random() < 0.5 ? 0 : 1, itT: [0, 0], immune: 0, pickX: 1400, pk: [], prevChar: prevChar, lead: -1, tauntT: 0,
                     p: [{ h: h1, ch: vsSel.p[0], held: false, stun: 0, safe: 0, hits: 0, pen: 0, falls: 0 }, { h: h2, ch: vsSel.p[1], held: false, stun: 0, safe: 0, hits: 0, pen: 0, falls: 0 }] };
-    world.hazards = []; vsNoBosses(); game.banner = null;
+    world.hazards = []; vsNoBosses(); game.banner = null; if (vm === 'team') { world.nextCitizenX = hero.x + 700; world.safeCount = 2; }
     music.track = 'boss';
   }
-  function vsNoBosses() { world.nextCrabX = world.nextFinalBossX = world.nextBossX = world.nextHazardX = Infinity; if (game.versus && game.versus.mode !== 'stars') world.nextCitizenX = Infinity; }
+  function vsNoBosses() { var m = game.versus && game.versus.mode; world.nextCrabX = world.nextFinalBossX = world.nextBossX = Infinity; if (m !== 'team') world.nextHazardX = Infinity; if (m !== 'stars' && m !== 'team') world.nextCitizenX = Infinity; }
+  function teamScore() { var V = game.versus; return game.rescued * 10 + V.p[0].h.stars + V.p[1].h.stars; }
   function endVersus() { if (!game.versus) return; var V = game.versus; hero = V.p[0].h; game.character = V.prevChar || game.character; game.versus = null; TUNING.gravity = BASE_GRAVITY; }
   function vsScore(i) { var V = game.versus, p = V.p[i]; if (V.mode === 'tag') return Math.round(V.itT[i] * 10) / 10; return V.mode === 'race' ? Math.max(0, Math.floor(p.h.maxX / 10) - p.pen) : V.mode === 'stars' ? p.h.stars : p.h.stars + p.hits * 5; }
   function vsSwap(p) { hero = p.h; game.character = p.ch; }
@@ -5434,7 +5465,7 @@
     var p = V.p[i]; if (p.stun > 0) return;
     var keep = hero, kc = game.character; vsSwap(p);
     if (hero.fireCool <= 0 && hero.ammo >= 1) {
-      var pt = V.mode === 'stars' && !hero.carry && pullTarget(760);
+      var pt = (V.mode === 'stars' || V.mode === 'team') && !hero.carry && pullTarget(760);
       if (pt) webPull(pt.c);
       else {
         hero.ammo -= 1; hero.fireCool = TUNING.fireCooldown;
@@ -5504,6 +5535,7 @@
     vsPickups(dt);
     var lead = vsScore(0) === vsScore(1) ? V.lead : (vsScore(0) > vsScore(1)) !== (V.mode === 'tag') ? 0 : 1;
     V.tauntT -= dt;
+    if (V.mode === 'team') lead = -1;
     if (lead !== V.lead && lead >= 0) {
       V.lead = lead;
       if (V.tauntT <= 0) { V.tauntT = 5; var lc = charById(V.p[lead].ch), tl = VS_TAUNTS[Math.floor(Math.random() * VS_TAUNTS.length)];
@@ -5515,6 +5547,15 @@
     if (V.t <= 0 || (V.mode === 'race' && (vsScore(0) >= VS_RACE || vsScore(1) >= VS_RACE))) vsFinish();
   }
   function vsFinish() {
+    if (game.versus.mode === 'team') {   // co-op: shared score + team high score
+      var TV = game.versus, sc = teamScore(), best = save.teamBest || 0;
+      TV.result = { team: sc, best: Math.max(best, sc), newBest: sc > best, w: -1, a: TV.p[0].h.stars, b: TV.p[1].h.stars, rescued: game.rescued };
+      if (sc > best) { save.teamBest = sc; writeSave(); mirrorNow(); }
+      if (game.rescued >= 5) medal('vsteam');
+      game.state = 'vsEnd'; game.overTime = 0; TV.p.forEach(function (p) { p.held = false; p.h.rope = null; });
+      for (var ti = 0; ti < 6; ti++) burst(hero.x + rand(-200, 200), hero.y - rand(50, 250), ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff'][ti % 4], 18, 'confetti');
+      sfx('victory'); return;
+    }
     var V = game.versus, a = vsScore(0), b = vsScore(1), w = a === b ? -1 : (a > b) !== (V.mode === 'tag') ? 0 : 1;
     if (w >= 0) { vsSel.wins[w]++; medal('vswin'); if (vsSel.wins[w] >= 2) medal('vschamp'); if (V.mode === 'tag') medal('vstag'); }
     V.result = { a: a, b: b, w: w, champ: w >= 0 && vsSel.wins[w] >= 2 };
@@ -5533,6 +5574,15 @@
     ctx.fillStyle = 'rgba(15,18,50,0.72)'; ctx.fillRect(0, 0, screenW, screenH);
     if (game.overTime % 0.5 < 0.02) burst(cam.x + viewW * Math.random(), cam.y + 50, ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff'][Math.floor(Math.random() * 4)], 10, 'confetti');
     var big = Math.min(56, screenW / 10), top = safe.top + 20;
+    if (V.mode === 'team') {
+      var tt = R.newBest ? 'NEW TEAM HIGH SCORE!' : 'TEAM SCORE';
+      text(tt, screenW / 2, top + big * 0.7, fitSize(tt, big, screenW - 30), '#3ddc84');
+      text(R.team + ' pts', screenW / 2, top + big * 1.8, big * 1.1, '#ffd23f');
+      text('People saved: ' + R.rescued + '   Best: ' + R.best, screenW / 2, top + big * 2.8, 20, '#ffffff', 'center', '800');
+      [0, 1].forEach(function (i) { var ch = charById(V.p[i].ch), x = screenW / 2 + (i ? 1 : -1) * Math.min(screenW * 0.22, 220); drawCharacter(ch, x, screenH * 0.6 - Math.abs(Math.sin(t * 5 + i)) * 14, Math.min(screenH * 0.26, screenW * 0.22), 0, t, 0, 0, null); text('P' + (i + 1) + ' ' + ch.name, x, screenH * 0.6 + Math.min(screenH * 0.15, 120), 16, VS_COLORS[i]); });
+      if (game.overTime > 0.8) { button(O.rematch, 'PLAY AGAIN', '#3ddc84'); button(O.menu, 'MENU', '#4f8bff'); }
+      return;
+    }
     var title = R.w < 0 ? 'IT\'S A TIE!' : R.champ ? 'PLAYER ' + (R.w + 1) + ' IS CHAMPION!' : 'PLAYER ' + (R.w + 1) + ' WINS!';
     text(title, screenW / 2, top + big * 0.7, fitSize(title, big, screenW - 30), R.w < 0 ? '#ffd23f' : VS_COLORS[R.w]);
     var sz = Math.min(screenH * 0.3, screenW * 0.25), cy = top + big * 1.6 + sz * 0.6;
@@ -5572,6 +5622,7 @@
   function drawVsHUD(t) {
     var V = game.versus, s = Math.max(16, Math.min(26, Math.min(screenW, screenH) / 18)), T = safe.top + 18;
     var tl = Math.max(0, Math.ceil(V.t)), mode = VS_MODES[vsSel.mode].name;
+    if (V.mode === 'team') { var pr0 = pauseButtonRect(); text('TEAM ' + teamScore() + ' pts   saved ' + game.rescued + '   best ' + (save.teamBest || 0), screenW / 2, pr0.y + pr0.h + 38, Math.max(13, s * 0.6), '#3ddc84', 'center', '900'); }
     [0, 1].forEach(function (i) {
       var x = i ? screenW - safe.right - 14 : safe.left + 14, al = i ? 'right' : 'left', sc = vsScore(i);
       text('P' + (i + 1) + ' ' + charById(V.p[i].ch).name.split(' ')[0], x, T, s * 0.7, VS_COLORS[i], al, '900');
@@ -5645,6 +5696,180 @@
     if (V.say && V.say.i === i) { ctx.globalAlpha = Math.min(1, V.say.life * 3); text(V.say.text, x, y - size * 0.62 - 78, 16, '#ffffff', 'center', '900'); ctx.globalAlpha = 1; }
   }
 
+  /* ---------- SUIT LAB: alternate suits for the drawn heroes ---------- */
+  var SUITS = [ { id: 'classic', name: 'Original', cost: 0, col: '#ffffff' }, { id: 'symbiote', name: 'Symbiote Black', cost: 40, col: '#3a3a4a' },
+                { id: 'gold', name: 'Gold', cost: 60, col: '#ffcc33' }, { id: 'ice', name: 'Ice', cost: 40, col: '#9fe8ff' },
+                { id: 'stripes', name: 'Stripes', cost: 30, col: '#ff6b6b' }, { id: 'neon', name: 'Neon Green', cost: 50, col: '#7dff8a' } ];
+  var suitCache = {};
+  function suitOf(id) { var s = save.suits && save.suits.on && save.suits.on[id]; return s && s !== 'classic' ? s : null; }
+  function suitDef(id) { for (var i = 0; i < SUITS.length; i++) if (SUITS[i].id === id) return SUITS[i]; return null; }
+  function suitImage(img, sid, key) {
+    var k = key + '|' + sid; if (suitCache[k]) return suitCache[k];
+    var S = suitDef(sid); if (!S || !img.naturalWidth) return img;
+    var w = img.naturalWidth, h = img.naturalHeight, c = document.createElement('canvas'); c.width = w; c.height = h;
+    var g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = 'multiply'; g.fillStyle = S.col; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'source-atop';
+    if (sid === 'symbiote') { g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = w * 0.03; g.beginPath(); for (var a = 0; a < 4; a++) { g.moveTo(w / 2, h * 0.42); g.lineTo(w * (a < 2 ? 0.2 : 0.8), h * (a % 2 ? 0.62 : 0.3)); } g.stroke(); }
+    if (sid === 'gold') { var gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, 'rgba(255,255,255,0.45)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,240,180,0.4)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }
+    if (sid === 'ice') { g.fillStyle = 'rgba(255,255,255,0.7)'; for (var q = 0; q < 40; q++) { g.beginPath(); g.arc(hash(q) * w, hash(q + 50) * h, w * 0.012, 0, 6.283); g.fill(); } }
+    if (sid === 'stripes') { g.fillStyle = 'rgba(255,255,255,0.4)'; for (var y = -h; y < h * 2; y += h * 0.09) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + w * 0.5); g.lineTo(w, y + w * 0.5 + h * 0.035); g.lineTo(0, y + h * 0.035); g.fill(); } }
+    if (sid === 'neon') { g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 0, w, h); }
+    g.globalCompositeOperation = 'destination-in'; g.drawImage(img, 0, 0);
+    c.naturalWidth = w; c.naturalHeight = h;
+    suitCache[k] = c; return c;
+  }
+  function openSuitLab() { game.state = 'suitlab'; game.suitHero = characterIndex(); game.suitMsg = null; sfx('select'); }
+  function suitLabLayout() {
+    var top = safe.top + 10, landscape = screenW > screenH, W = screenW - safe.left - safe.right;
+    var pv = landscape ? { x: safe.left + 20, y: top + 60, w: W * 0.38, h: screenH - top - safe.bottom - 80 } : { x: (screenW - Math.min(W - 40, 320)) / 2, y: top + 56, w: Math.min(W - 40, 320), h: Math.min(260, screenH * 0.32) };
+    var gx = landscape ? pv.x + pv.w + 20 : safe.left + 16, gy = landscape ? top + 70 : pv.y + pv.h + 16, gw = landscape ? screenW - safe.right - 16 - gx : W - 32;
+    var cols = 2, bh = Math.max(44, Math.min(64, ((landscape ? screenH - safe.bottom - 20 : screenH - safe.bottom - 20) - gy) / 3 - 10)), bw = (gw - 10) / cols;
+    var cells = SUITS.map(function (s, i) { return { x: gx + (i % cols) * (bw + 10), y: gy + Math.floor(i / cols) * (bh + 10), w: bw, h: bh }; });
+    return { back: { x: safe.left + 10, y: top, w: 100, h: 42 }, pv: pv, cells: cells, prev: { x: pv.x, y: pv.y + pv.h / 2 - 26, w: 44, h: 52 }, next: { x: pv.x + pv.w - 44, y: pv.y + pv.h / 2 - 26, w: 44, h: 52 } };
+  }
+  function drawSuitLab(t) {
+    ctx.fillStyle = 'rgba(15,18,50,0.9)'; ctx.fillRect(0, 0, screenW, screenH);
+    var S = suitLabLayout(), ch = CHARACTERS[game.suitHero] || currentCharacter(), on = (save.suits && save.suits.on && save.suits.on[ch.id]) || 'classic';
+    text('SUIT LAB', screenW / 2, S.back.y + 22, Math.min(34, screenW / 11), '#b14fff');
+    text('★ ' + bank, screenW - safe.right - 16, S.back.y + 22, 18, '#ffd23f', 'right', '900');
+    button(S.back, 'BACK', '#4f8bff');
+    roundRect(S.pv.x, S.pv.y, S.pv.w, S.pv.h, 18); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+    drawCharacter(ch, S.pv.x + S.pv.w / 2, S.pv.y + S.pv.h / 2 - 8, Math.min(S.pv.h - 50, S.pv.w - 100), Math.sin(t * 2) * 0.05, t, 0, 0, null);
+    text(ch.name, S.pv.x + S.pv.w / 2, S.pv.y + S.pv.h - 14, fitSize(ch.name, 18, S.pv.w - 100), '#ffffff', 'center', '800');
+    button(S.prev, '<', '#4f8bff'); button(S.next, '>', '#4f8bff');
+    var drawn = !!getImage(ch.file);
+    S.cells.forEach(function (c, i) {
+      var su = SUITS[i], owned = su.cost === 0 || (save.suits && save.suits.owned && save.suits.owned[su.id]);
+      button(c, su.name + (on === su.id ? '  (ON)' : owned ? '' : '  ★' + su.cost), on === su.id ? '#3ddc84' : owned ? '#4f8bff' : '#8a92a6');
+      ctx.fillStyle = su.col; ctx.beginPath(); ctx.arc(c.x + 18, c.y + c.h / 2, 9, 0, 6.283); ctx.fill(); ctx.strokeStyle = '#151a3a'; ctx.lineWidth = 2; ctx.stroke();
+    });
+    var msg = game.suitMsg || (drawn ? 'Pick a suit for ' + ch.name + '. Buy new suits with stars.' : 'Suits work on the drawn heroes.');
+    text(msg, screenW / 2, screenH - safe.bottom - 12, fitSize(msg, 14, screenW - 20), '#ffd23f', 'center', '800');
+  }
+  function suitLabPress(px, py, tap) {
+    var S = suitLabLayout();
+    if (!tap || inRect(px, py, S.back)) { game.state = 'title'; sfx('select'); return; }
+    var d = inRect(px, py, S.prev) ? -1 : inRect(px, py, S.next) ? 1 : 0;
+    if (d) { game.suitHero = (game.suitHero + d + CHARACTERS.length) % CHARACTERS.length; game.suitMsg = null; sfx('select'); return; }
+    var ch = CHARACTERS[game.suitHero];
+    S.cells.forEach(function (c, i) {
+      if (!inRect(px, py, c)) return;
+      var su = SUITS[i]; save.suits = save.suits || { owned: {}, on: {} }; save.suits.owned = save.suits.owned || {}; save.suits.on = save.suits.on || {};
+      var owned = su.cost === 0 || save.suits.owned[su.id];
+      if (!owned) {
+        if (bank < su.cost) { sfx('nope'); game.suitMsg = 'Need ' + su.cost + ' stars (you have ' + bank + '). Play to earn more!'; return; }
+        allowDowngrade(function () { bank -= su.cost; saveShop(); });
+        save.suits.owned[su.id] = 1; game.suitMsg = 'Unlocked ' + su.name + '!'; sfx('medal');
+      } else sfx('select');
+      save.suits.on[ch.id] = su.id; writeSave(); mirrorNow();
+    });
+  }
+
+  /* ---------- SWING TRICKS ---------- */
+  var TRICKS = [ { id: 'cork', name: 'CORKSCREW', how: 'Do a double flip while going really fast', pts: 120 },
+                 { id: 'land', name: 'SUPERHERO LANDING', how: 'Drop onto a roof from way up high', pts: 60 },
+                 { id: 'zipkick', name: 'WEB-ZIP KICK', how: 'FIRE right after a PERFECT release', pts: 80 },
+                 { id: 'boing', name: 'BOING FLIP', how: 'Flip after bouncing on a BOING pad', pts: 90 },
+                 { id: 'swingby', name: 'SWING-BY RESCUE', how: 'Web-pull someone while flying fast', pts: 100 } ];
+  function doTrick(id) {
+    var T = TRICKS.filter(function (x) { return x.id === id; })[0]; if (!T) return;
+    save.tricks = save.tricks || {}; var first = !save.tricks[id];
+    save.tricks[id] = (save.tricks[id] || 0) + 1;
+    trick(T.pts, T.name + '!', '#ff4f9a'); sfx('trick');
+    if (first) { toast('NEW TRICK: ' + T.name); if (TRICKS.every(function (x) { return save.tricks[x.id]; })) medal('tricks5'); }
+  }
+  function drawTricks(t) {
+    ctx.fillStyle = 'rgba(15,18,50,0.92)'; ctx.fillRect(0, 0, screenW, screenH);
+    var top = safe.top + 16, rh = Math.min(76, (screenH - top - safe.bottom - 90) / TRICKS.length), w = Math.min(560, screenW - 30), x = (screenW - w) / 2;
+    text('SWING TRICKS', screenW / 2, top + 18, Math.min(36, screenW / 11), '#ff4f9a');
+    TRICKS.forEach(function (T, i) {
+      var y = top + 54 + i * rh, n = (save.tricks && save.tricks[T.id]) || 0;
+      roundRect(x, y, w, rh - 8, 12); ctx.fillStyle = n ? 'rgba(61,220,132,0.18)' : 'rgba(255,255,255,0.08)'; ctx.fill();
+      text(T.name, x + 14, y + rh * 0.3, Math.min(20, rh * 0.3), n ? '#3ddc84' : '#ffffff', 'left', '900');
+      text(T.how, x + 14, y + rh * 0.62, fitSize(T.how, Math.min(15, rh * 0.22), w - 120), '#c9cfe0', 'left', '700');
+      text(n ? 'x' + n : '?', x + w - 16, y + rh * 0.42, Math.min(24, rh * 0.35), n ? '#ffd23f' : '#8a92a6', 'right', '900');
+    });
+    text('Tap anywhere to go back', screenW / 2, screenH - safe.bottom - 16, 14, '#8a92a6', 'center', '700');
+  }
+  function toast(msg) { game.toast = { text: msg, life: 2.6, title: msg }; }
+
+  /* ---------- PHOTO MODE (pause -> SNAP) ---------- */
+  function takePhoto() {
+    var st = game.state; game.state = 'photo';
+    try { render(game.time); } catch (e) { noteLoopError('photo', e); } finally { game.state = st; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var W = screenW, H = screenH, b = Math.max(12, Math.min(W, H) * 0.03);
+    var g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#ff3b3b'); g.addColorStop(0.5, '#ffd23f'); g.addColorStop(1, '#4f8bff');
+    ctx.lineWidth = b * 2; ctx.strokeStyle = g; ctx.strokeRect(0, 0, W, H);
+    var tw = Math.min(W * 0.7, 420); roundRect((W - tw) / 2, b * 0.4, tw, b * 3, b); ctx.fillStyle = '#151a3a'; ctx.fill();
+    text('WEB SWING CITY', W / 2, b * 1.9, fitSize('WEB SWING CITY', b * 1.9, tw - 20), '#ffd23f');
+    for (var i = 0; i < 10; i++) { ctx.fillStyle = ['#ffd23f', '#ff8ab3', '#7df9ff'][i % 3]; starPath(hash(i + 70) < 0.5 ? b * (1 + hash(i) * 3) : W - b * (1 + hash(i) * 3), b * 4 + hash(i + 7) * (H - b * 8), b * 0.7, b * 0.3); ctx.fill(); }
+    var kids = [['red', 'Monte'], [ROSA.heart.id, 'Rosa'], ['rocky-web', 'Kara']], sz = Math.min(W, H) * 0.12;
+    kids.forEach(function (k, j) { var ch = charById(k[0]); if (!ch) return; var x = b * 2 + sz * 0.5 + j * sz * 0.95, y = H - b * 2 - sz * 0.55;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(x, y, sz * 0.55, 0, 6.283); ctx.fill(); drawCharacter(ch, x, y, sz * 0.95, 0, game.time, 0, 0, null); text(k[1], x, y + sz * 0.62, Math.max(10, sz * 0.16), '#151a3a', 'center', '900'); });
+    var d = new Date(), ds = d.toLocaleDateString();
+    text(currentCharacter().name + '  ' + ds, W - b * 2, H - b * 2, Math.max(12, b), '#ffffff', 'right', '900');
+    var url = ''; try { url = canvas.toDataURL('image/png'); } catch (e) { noteLoopError('photo', e); }
+    window.__lastPhoto = url; if (!url || url.length < 100) { toast('Photo could not be saved here'); return; } sfx('perfect'); game.photoFlash = 0.35; toast('Photo saved!');
+    try { var a = document.createElement('a'); a.href = url; a.download = 'web-swing-city-photo-' + Date.now() + '.png'; document.body.appendChild(a); a.click(); setTimeout(function () { a.remove(); }, 500); } catch (e) { /* ignore */ }
+  }
+
+  /* ---------- BOSS REMATCH gallery (Hard, timed, medals) ---------- */
+  var REMATCH = [ { id: 'crab', name: 'Robo-Crab', lvl: 5 }, { id: 'king', name: 'Scribble King', lvl: 7 }, { id: 'heart', name: HN, lvl: 8 }, { id: 'ovals', name: BN, lvl: 9 },
+                  { id: 'spotty', name: SN, lvl: 11 }, { id: 'queen', name: QN, lvl: 12 }, { id: 'hulk', name: RN, lvl: 13 } ];
+  var REMATCH_CHAR = { heart: ROSA.heart.id, ovals: ROSA.sister.id, spotty: VILLAINS.spotty.id, queen: VILLAINS.queen.id, hulk: VILLAINS.hulk.id };
+  function rematchOpen(r) { return UNLOCK_ALL || !!(save.levels[r.lvl] && save.levels[r.lvl].done); }
+  function rematchTier(t) { return t < 60 ? 3 : t < 100 ? 2 : 1; }
+  function startRematch(id) {
+    var R = REMATCH.filter(function (x) { return x.id === id; })[0]; if (!R) return;
+    endDaily(); endVersus();
+    var L0 = LEVELS[R.lvl];
+    game.mode = 'story'; game.levelIndex = R.lvl; game.remix = false;
+    game.level = { name: 'Rematch: ' + R.name, zone: L0.zone, goal: L0.goal, target: 1, bonus: { time: 90 }, enemies: ['drone', 'bird'], diff: 0.6, boss: id === 'king' ? undefined : id, rematch: id, kingHp: id === 'king' ? 1.2 : undefined };
+    startGame();
+    world.nextCrabX = Math.min(world.nextCrabX, hero.x + 900); world.nextFinalBossX = Math.min(world.nextFinalBossX, hero.x + 1200);
+  }
+  function rematchDone() {
+    var id = game.level.rematch, t = Math.round(game.playTime * 10) / 10, tier = rematchTier(t);
+    save.rematch = save.rematch || {}; var r = save.rematch[id] || {};
+    var nb = !r.best || t < r.best;
+    save.rematch[id] = { best: r.best ? Math.min(r.best, t) : t, tier: Math.max(r.tier || 0, tier) };
+    writeSave(); mirrorNow(); medal('rematch'); if (tier === 3) medal('rematchg');
+    game.rematchMsg = { text: 'Beat ' + REMATCH.filter(function (x) { return x.id === id; })[0].name + ' in ' + t + 's: ' + ['', 'BRONZE', 'SILVER', 'GOLD'][tier] + (nb ? '  NEW BEST!' : ''), tier: tier };
+    music.track = 'main'; toTitleScenery(); game.state = 'bosses'; sfx('victory');
+  }
+  function bossesLayout() {
+    var top = safe.top + 10, cols = screenW > screenH ? 4 : 2, gap = 10, W = Math.min(screenW - 30, 900), cw = (W - gap * (cols - 1)) / cols;
+    var rows = Math.ceil(REMATCH.length / cols), ch = Math.min(180, (screenH - top - 110 - safe.bottom) / rows - gap), x0 = (screenW - W) / 2;
+    return { back: { x: safe.left + 10, y: top, w: 100, h: 42 }, cards: REMATCH.map(function (r, i) { return { x: x0 + (i % cols) * (cw + gap), y: top + 90 + Math.floor(i / cols) * (ch + gap), w: cw, h: ch }; }) };
+  }
+  var TIER_COL = ['#555a70', '#cd7f32', '#c0c8d8', '#ffd23f'];
+  function drawBosses(t) {
+    ctx.fillStyle = 'rgba(15,18,50,0.92)'; ctx.fillRect(0, 0, screenW, screenH);
+    var B = bossesLayout();
+    text('BOSS REMATCH', screenW / 2, B.back.y + 22, Math.min(34, screenW / 11), '#ff3b3b');
+    var sub = game.rematchMsg ? game.rematchMsg.text : 'HARD mode, against the clock. Gold under 60 s, silver under 100 s!';
+    text(sub, screenW / 2, B.back.y + 62, fitSize(sub, 16, screenW - 20), game.rematchMsg ? TIER_COL[game.rematchMsg.tier] : '#ffffff', 'center', '800');
+    button(B.back, 'BACK', '#4f8bff');
+    B.cards.forEach(function (c, i) {
+      var R = REMATCH[i], open = rematchOpen(R), rec = save.rematch && save.rematch[R.id];
+      roundRect(c.x, c.y, c.w, c.h, 14); ctx.fillStyle = open ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.3)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = rec ? TIER_COL[rec.tier] : '#3a3f66'; ctx.stroke();
+      var cid = REMATCH_CHAR[R.id], sz = c.h * 0.55;
+      if (open && cid && charById(cid)) drawCharacter(charById(cid), c.x + c.w / 2, c.y + c.h * 0.4, sz, 0, t, 0, 0, null);
+      else if (open && R.id === 'crab') { ctx.save(); ctx.translate(c.x + c.w / 2, c.y + c.h * 0.42); drawCrabShape(sz / 260, t, null); ctx.restore(); }
+      else text(open ? 'KING' : 'LOCKED', c.x + c.w / 2, c.y + c.h * 0.4, open ? sz * 0.35 : 16, open ? '#7a3fd0' : '#8a92a6');
+      text(R.name, c.x + c.w / 2, c.y + c.h - 30, fitSize(R.name, 16, c.w - 12), '#ffffff', 'center', '800');
+      text(rec ? 'Best ' + rec.best + 's' : open ? 'Tap to fight!' : 'Beat level ' + (R.lvl + 1), c.x + c.w / 2, c.y + c.h - 12, 12, rec ? TIER_COL[rec.tier] : '#c9cfe0', 'center', '800');
+      if (rec) { ctx.fillStyle = TIER_COL[rec.tier]; ctx.beginPath(); ctx.arc(c.x + c.w - 18, c.y + 18, 11, 0, 6.283); ctx.fill(); }
+    });
+  }
+  function bossesPress(px, py, tap) {
+    var B = bossesLayout();
+    if (!tap || inRect(px, py, B.back)) { game.state = 'map'; sfx('select'); return; }
+    B.cards.forEach(function (c, i) { if (inRect(px, py, c)) { if (rematchOpen(REMATCH[i])) startRematch(REMATCH[i].id); else sfx('nope'); } });
+  }
+
   /* ---------- FUN MODIFIERS screen (Settings) ---------- */
   function funLayout() {
     var bw = Math.min(320, screenW * 0.82), bh = Math.max(40, Math.min(56, (screenH - safe.top - safe.bottom - 140) / 5 - 10)), g = 10;
@@ -5710,6 +5935,7 @@
     else if (inRect(px, py, S.reset)) { game.confirmReset = true; sfx('nope'); }
     else if (inRect(px, py, S.credits)) { game.state = 'credits'; sfx('select'); }
     else if (inRect(px, py, S.fun)) { game.state = 'fun'; sfx('select'); }
+    else if (inRect(px, py, S.tricks)) { game.state = 'tricks'; sfx('select'); }
     else if (inRect(px, py, S.savecode)) { sfx('select'); openSaveCode(); }
     else if (inRect(px, py, S.back)) { game.state = 'title'; sfx('select'); }
   }
@@ -5775,7 +6001,7 @@
     var next = pages > 1 ? { x: screenW - safe.right - 6 - arrowW, y: cardY + cardH / 2 - 30, w: arrowW, h: 60 } : null;
     var y = cardY + cardH + avail * 0.025;
     var ph = Math.max(36, Math.min(46, avail * 0.065)), pw = Math.min(340, W - 40);
-    var power = { x: (screenW - pw) / 2, y: y, w: pw, h: ph };
+    var power = { x: (screenW - pw) / 2, y: y, w: pw * 0.64, h: ph }, suitlab = { x: power.x + pw * 0.64 + 8, y: y, w: pw * 0.36 - 8, h: ph };
     y += ph + avail * 0.025;
     var bigH = Math.max(50, Math.min(70, avail * 0.1)), bigW = Math.min(190, (W - 44) / 4), bx1 = (screenW - (bigW * 4 + 24)) / 2;
     var big = function (k) { return { x: bx1 + k * (bigW + 8), y: y, w: bigW, h: bigH }; };
@@ -5783,7 +6009,7 @@
     y += bigH + avail * 0.025;
     var bh = Math.max(42, Math.min(52, avail * 0.075)), g2 = 8, bw = Math.min(150, (W - 24 - g2 * 3) / 4), bx0 = (screenW - (bw * 4 + g2 * 3)) / 2;
     function btn(k) { return { x: bx0 + k * (bw + g2), y: y, w: bw, h: bh }; }
-    return { top: top, titleH: titleH, cards: cards, prev: prev, next: next, power: power, story: story, endless: endless, daily: daily, versus: versus,
+    return { top: top, titleH: titleH, cards: cards, prev: prev, next: next, power: power, suitlab: suitlab, story: story, endless: endless, daily: daily, versus: versus,
              shop: btn(0), medals: btn(1), maker: btn(2), settings: btn(3), below: y + bh, bottom: bottom, pages: pages, page: page };
   }
   function drawTitle(t) {
@@ -5837,7 +6063,8 @@
       ctx.moveTo(mx + d * 9, my); ctx.lineTo(mx - d * 7, my - 13); ctx.lineTo(mx - d * 7, my + 13); ctx.closePath(); ctx.fill();
     });
     var pw = currentPower(), p = powerDef(pw), any = POWERS.some(function (q) { return powerUnlocked(q.id); });
-    button(L.power, any ? 'POWER: ' + (p ? p.name : 'NONE') + '  (tap to change)' : 'POWERS: win Story levels!', p ? p.color : '#8a92a6', '#ffffff');
+    button(L.power, any ? 'POWER: ' + (p ? p.name : 'NONE') : 'POWERS: win levels!', p ? p.color : '#8a92a6', '#ffffff');
+    button(L.suitlab, 'SUIT LAB', '#b14fff');
     if (p) drawPowerIcon(p.id, L.power.x + L.power.h * 0.55, L.power.y + L.power.h / 2, L.power.h * 0.36, t);
     button(L.story, 'STORY ' + totalStars() + '/' + LEVELS.length * 3, '#3ddc84');
     ctx.fillStyle = '#ffd23f'; starPath(L.story.x + L.story.w - 16, L.story.y + 14, 8, 3.5); ctx.fill();
@@ -5866,6 +6093,7 @@
     if (L.prev && inRect(px, py, L.prev)) { game.cardPage = (L.page - 1 + L.pages) % L.pages; sfx('select'); return; }
     if (L.next && inRect(px, py, L.next)) { game.cardPage = (L.page + 1) % L.pages; sfx('select'); return; }
     if (inRect(px, py, L.power)) { cyclePower(); return; }
+    if (inRect(px, py, L.suitlab)) { openSuitLab(); return; }
     if (inRect(px, py, L.story)) { openMap(); return; }
     if (inRect(px, py, L.endless)) { startEndless(); return; }
     if (inRect(px, py, L.daily)) { startDaily(); return; }
@@ -6950,7 +7178,7 @@
   var DIFF_ORDER = ['easy', 'normal', 'hard'];
   if (DEBUG_DIFF && DIFFS[DEBUG_DIFF]) save.difficulty = DEBUG_DIFF;
   Object.keys(save.seen || {}).forEach(function (k) { if (k.indexOf('pick-') === 0) save.seen['pick-' + migrateHeroId(k.slice(5))] = true; });   // old hero ids (round 7)
-  function diffCfg() { return DIFFS[save.difficulty] || DIFFS.normal; }
+  function diffCfg() { if (typeof game !== 'undefined' && game && game.level && game.level.rematch) return DIFFS.hard; return DIFFS[save.difficulty] || DIFFS.normal; }
   function paradeNeeds() { return PARADE[save.difficulty] || PARADE.normal; }
   function maxHearts() { return TUNING.hearts + diffCfg().hearts; }
   function cycleDifficulty() {
@@ -7350,7 +7578,7 @@
     importSave: importSave, parseSaveCode: parseSaveCode, flushProgress: flushProgress, snapshot: snapshot, storageWarning: storageWarning,
     openSaveCode: openSaveCode, mergeSnapshots: mergeSnapshots, fullSnapshot: fullSnapshot, closeSaveCode: closeSaveCode, game: game, hero: hero, world: world, TUNING: TUNING, CHARACTERS: CHARACTERS,
     start: function () { if (DEBUG_LEVEL) playLevel(clamp(DEBUG_LEVEL - 1, 0, LEVELS.length - 1), true); else startEndless(); }, press: apiPress,
-    playLevel: playLevel, openMap: openMap, goalProgress: function () { return goalProgress(); }, startDaily: startDaily, openVersus: openVersus, startVersus: startVersus, vsSel: vsSel, vs: function () { return game.versus; }, vsFire: vsFire, webPull: webPull, gameRef: function () { return game; }, heroRef: function () { return hero; }, dailySetup: dailySetup, LEVELS: LEVELS, save: function () { return save; }, riff: riff, showStory: showStory, openMaker: openMaker, maker: maker,
+    playLevel: playLevel, openMap: openMap, tapUI: function (x, y) { withUI(function () { press(x, y); }); }, layout: function (n) { return withUI(function () { return n === "suit" ? suitLabLayout() : n === "bosses" ? bossesLayout() : n === "pause" ? pauseLayout() : null; }); }, bank: function () { return bank; }, startRematch: startRematch, takePhoto: takePhoto, openSuitLab: openSuitLab, doTrick: doTrick, goalProgress: function () { return goalProgress(); }, startDaily: startDaily, openVersus: openVersus, startVersus: startVersus, vsSel: vsSel, vs: function () { return game.versus; }, vsFire: vsFire, webPull: webPull, gameRef: function () { return game; }, heroRef: function () { return hero; }, dailySetup: dailySetup, LEVELS: LEVELS, save: function () { return save; }, riff: riff, showStory: showStory, openMaker: openMaker, maker: maker,
     usePower: usePower, spawnEnemy: spawnEnemy, startCrab: startCrab, mapLayout: apiLayout(mapLayout), mapCardLayout: apiLayout(mapCardLayout), levelEndLayout: apiLayout(levelEndLayout),
     settingsLayout: apiLayout(settingsLayout), citizens: function () { return world.citizens; }, goalProgress: goalProgress, powerButtonRect: apiLayout(powerButtonRect),
     startCharge: startCharge, releaseCharge: releaseCharge, POWERS: POWERS, storyLayout: apiLayout(storyLayout), dismissTutorial: dismissTutorial,
