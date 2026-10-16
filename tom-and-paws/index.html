@@ -1089,7 +1089,7 @@ function normalizeSave(){
   save.daily=Object.assign({day:'',cleared:false,kind:''},save.daily||{});
   save.endlessPrizes=save.endlessPrizes||{};
   if(save.mouse){ save.mouse=Object.assign({stars:{},played:0},save.mouse); save.mouse.stars=save.mouse.stars||{}; }
-  if(save.themes&&typeof save.themes==='object'){ for(const k of ['storm','halloween']) if(save.themes[k]){ save.themes[k]=Object.assign({wins:0,stars:{}},save.themes[k]); save.themes[k].stars=save.themes[k].stars||{}; } } else delete save.themes;
+  if(save.themes&&typeof save.themes==='object'){ for(const k of ['storm','halloween','xmas']) if(save.themes[k]){ save.themes[k]=Object.assign({wins:0,stars:{}},save.themes[k]); save.themes[k].stars=save.themes[k].stars||{}; } } else delete save.themes;
   if(typeof save.coins!=='number'||!isFinite(save.coins)) save.coins=0;
   if(!['small','medium','large'].includes(save.ctrlSize)) save.ctrlSize='medium';
 }
@@ -1103,7 +1103,7 @@ function mergeSaves(base,inc){
   out.skins={}; for(const w of ['cat','dog']) out.skins[w]=[...new Set([...((base.skins||{})[w]||[]),...((inc.skins||{})[w]||[])])];
   out.coins=mx(base.coins,inc.coins); out.totalScore=mx(base.totalScore,inc.totalScore); out.bestWave=mx(base.bestWave,inc.bestWave);
   if(base.mouse||inc.mouse){ const a=base.mouse||{}, b=inc.mouse||{}; out.mouse=Object.assign({},a,b,{stars:maxMap(a.stars,b.stars),played:mx(a.played,b.played)}); }
-  if(base.themes||inc.themes){ out.themes={}; for(const k of ['storm','halloween']){ const a=(base.themes||{})[k], b=(inc.themes||{})[k]; if(a||b) out.themes[k]={wins:mx((a||{}).wins,(b||{}).wins),stars:maxMap((a||{}).stars,(b||{}).stars)}; } }
+  if(base.themes||inc.themes){ out.themes={}; for(const k of ['storm','halloween','xmas']){ const a=(base.themes||{})[k], b=(inc.themes||{})[k]; if(a||b) out.themes[k]={wins:mx((a||{}).wins,(b||{}).wins),stars:maxMap((a||{}).stars,(b||{}).stars)}; } }
   const da=base.daily||{}, db=inc.daily||{}; out.daily=(String(db.day||'')>=String(da.day||''))?db:da;
   return out;
 }
@@ -1557,6 +1557,8 @@ const BIOMES={
   laundry:{name:'Laundry Room',  g1:'#e8f4ff',g2:'#d6ebff',wall:'#7aa0c4',wallTop:'#9dbddb',deco:'*'},
   storm:  {name:'Storm Sky',     g1:'#8fb0c2',g2:'#83a5b8',wall:'#4a5d73',wallTop:'#66809a',deco:'*',storm:true},
   halloween:{name:'Pumpkin Night',g1:'#9a8bc0',g2:'#8e7fb5',wall:'#4b3570',wallTop:'#6a4f96',deco:'*',halloween:true},
+  hollow:{name:'Candy Hollow',g1:'#b7a6d6',g2:'#a998cb',wall:'#5a3d7a',wallTop:'#7a58a0',deco:'*',halloween:true},
+  xmas:{name:'Snowy Christmas',g1:'#f4f8fd',g2:'#e6eef8',wall:'#2f6b4a',wallTop:'#4a8f66',deco:'*',xmas:true},
 };
 /* 12 levels: difficulty & toys scale up, mechanics introduced gradually */
 const LEVELS=[
@@ -1632,6 +1634,16 @@ const LEVELS=[
  {b:'halloween',seed:1313,walls:13, time:76, dog:1.10,coins:15, bushes:5, puds:1, crates:3, tele:1, lava:0, halloween:true, ghosts:3, blocks:{fence:6,bush:3,pud:4,toy:2}, tip:'More friendly ghosts floating around. Win this one for a Witch costume!'},
  {b:'halloween',seed:1325,walls:16, time:78, dog:1.14,coins:16, bushes:6, puds:2, crates:3, tele:1, lava:0, halloween:true, ghosts:3, blocks:{fence:6,bush:4,pud:4,toy:2}, tip:'Jack-o\u2019-lanterns light the way. Use the pumpkin patch to hide!'},
  {b:'halloween',seed:1337,walls:19, time:82, dog:1.18,coins:17, bushes:6, puds:2, crates:4, tele:2, lava:0, halloween:true, ghosts:4, blocks:{fence:7,bush:4,pud:5,toy:2}, tip:'Big pumpkin party! Win it for the Pumpkin Paw costume!'},
+ /* ---- WORLD 15: CANDY HOLLOW — more cute Halloween: lanterns, friendly ghosts, treat bags ---- */
+ {b:'hollow',seed:1401,walls:11, time:76, dog:1.06,coins:14, bushes:6, puds:1, crates:3, tele:0, lava:0, halloween:true, ghosts:2, treats:3, blocks:{fence:5,bush:3,pud:4,toy:2}, tip:'CANDY HOLLOW! Grab the candy corn, and pick up orange TREAT BAGS for bonus points!'},
+ {b:'hollow',seed:1417,walls:14, time:78, dog:1.10,coins:15, bushes:6, puds:2, crates:3, tele:1, lava:0, halloween:true, ghosts:3, treats:3, blocks:{fence:6,bush:3,pud:4,toy:2}, tip:'Friendly ghosts float in circles. They only bump you softly!'},
+ {b:'hollow',seed:1433,walls:17, time:80, dog:1.14,coins:16, bushes:6, puds:2, crates:4, tele:1, lava:0, halloween:true, ghosts:3, treats:4, blocks:{fence:6,bush:4,pud:4,toy:2}, tip:'Use the teleport and the pumpkin patch to lose Paw!'},
+ {b:'hollow',seed:1449,walls:20, time:84, dog:1.18,coins:17, bushes:7, puds:2, crates:4, tele:2, lava:0, halloween:true, ghosts:4, treats:4, blocks:{fence:7,bush:4,pud:5,toy:2}, tip:'The biggest Halloween party yet! Treat bags everywhere!'},
+ /* ---- WORLD 16: SNOWY CHRISTMAS — snow, lights, candy canes, presents, friendly snowmen ---- */
+ {b:'xmas',seed:1501,walls:10, time:76, dog:1.04,coins:14, bushes:5, puds:1, crates:3, tele:0, lava:0, xmas:true, snowmen:2, treats:3, blocks:{fence:5,bush:3,pud:4,toy:2}, tip:'SNOWY CHRISTMAS! Grab 3 candy canes to open the door. Open PRESENTS for bonus points!'},
+ {b:'xmas',seed:1513,walls:13, time:78, dog:1.08,coins:15, bushes:5, puds:1, crates:3, tele:1, lava:0, xmas:true, snowmen:2, treats:3, blocks:{fence:6,bush:3,pud:4,toy:2}, tip:'Friendly snowmen slide around and bump you softly. Win for the Santa Hat!'},
+ {b:'xmas',seed:1525,walls:16, time:80, dog:1.12,coins:16, bushes:6, puds:2, crates:3, tele:1, lava:0, xmas:true, snowmen:3, treats:4, blocks:{fence:6,bush:4,pud:4,toy:2}, tip:'Hide in the little Christmas trees!'},
+ {b:'xmas',seed:1537,walls:19, time:84, dog:1.16,coins:17, bushes:6, puds:2, crates:4, tele:2, lava:0, xmas:true, snowmen:3, treats:4, blocks:{fence:7,bush:4,pud:5,toy:2}, tip:'Christmas Eve! Presents, lights and snow. Race to the door!'},
 ];
 
 function genLevel(idx){
@@ -2319,13 +2331,14 @@ const STICKER_DEFS=[
   {id:'pageFriends', title:'Play Together', ids:['twoPlayer']},
   {id:'pageMouse', title:'Mouse Chase', ids:['mouse0','mouse1','mouse2','mouse3']},
   {id:'pageStorm', title:'Storm Sky', ids:['storm0','storm1','storm2','storm3']},
-  {id:'pageHalloween', title:'Pumpkin Night', ids:['hal0','hal1','hal2','hal3']},
+  {id:'pageHalloween', title:'Pumpkin Night', ids:['hal0','hal1','hal2','hal3','hal4','hal5','hal6','hal7']},
+  {id:'pageXmas', title:'Snowy Christmas', ids:['xmas0','xmas1','xmas2','xmas3']},
 ];
 const STICKER_LOOK={
   clearcat0:'Forest',clearcat5:'Ice',clearcat10:'Candy',clearcat16:'Volcano',clearcat23:'Flower',clearcat27:'Cove',clearcat30:'Spider',clearcat32:'Sky',clearcat35:'City',clearcat38:'Sewer',clearcat42:'Puppy',clearcat45:'Moon',
   w0:'Bone',w5:'Bloom',w10:'Sweet',w16:'Lava',w23:'Bug',w27:'Shell',w30:'Web',w32:'Kite',w35:'Taxi',w38:'Rat',w42:'Ball',w45:'Ticket',
   donutDash:'Donut',donutSat:'Sat',zombie0:'Nap',zombie1:'Patch',zombie2:'Moon',zombie3:'Cheese',zombie4:'Bell',zombie5:'Line',
-  sock0:'Sock',sock1:'Basket',sock2:'Bandit',mouse0:'Peek',mouse1:'Pot',mouse2:'Moon',mouse3:'Pals',storm0:'Drop',storm1:'Splash',storm2:'Gust',storm3:'Bolt',hal0:'Corn',hal1:'Ghost',hal2:'Bat',hal3:'Jack',twoPlayer:'2P',dailyClear:'Daily',wave10:'W10',wave25:'W25',wave50:'W50',moonParade:'Parade'
+  sock0:'Sock',sock1:'Basket',sock2:'Bandit',mouse0:'Peek',mouse1:'Pot',mouse2:'Moon',mouse3:'Pals',storm0:'Drop',storm1:'Splash',storm2:'Gust',storm3:'Bolt',hal4:'Bag',hal5:'Lantern',hal6:'Owl',hal7:'Party',xmas0:'Cane',xmas1:'Gift',xmas2:'Tree',xmas3:'Star',hal0:'Corn',hal1:'Ghost',hal2:'Bat',hal3:'Jack',twoPlayer:'2P',dailyClear:'Daily',wave10:'W10',wave25:'W25',wave50:'W50',moonParade:'Parade'
 };
 function earnSticker(id, toastMsg){
   if(!id)return;
@@ -3073,27 +3086,35 @@ window.__mouse={ levels:()=>MOUSE_LEVELS.length, start:i=>startMouseLevel(i), st
 
 /* ---------------- STORM + HALLOWEEN worlds (reuse the campaign engine: tiles, fish, door, AI) ---------------- */
 const THEME_FROM=49;   /* Storm 49-52, Halloween 53-56 */
-function themeOf(d){ return d&&d.storm?'storm':(d&&d.halloween?'halloween':null); }
-function themeRec(){ save.themes=save.themes||{}; for(const k of ['storm','halloween']){ save.themes[k]=Object.assign({wins:0,stars:{}},save.themes[k]||{}); save.themes[k].stars=save.themes[k].stars||{}; } return save.themes; }
+function themeOf(d){ return d&&d.storm?'storm':(d&&d.halloween?'halloween':(d&&d.xmas?'xmas':null)); }
+function themeBase(th,idx){ return th==='storm'?49:(th==='xmas'?61:53); }
+function themeRec(){ save.themes=save.themes||{}; for(const k of ['storm','halloween','xmas']){ save.themes[k]=Object.assign({wins:0,stars:{}},save.themes[k]||{}); save.themes[k].stars=save.themes[k].stars||{}; } return save.themes; }
 function themeSpot(g,avoid,minD){
   for(let k=0;k<160;k++){ const f=randFloor(); const x=tcx(f.c), y=tcx(f.r);
     if(avoid.every(a=>Math.hypot(a.x-x,a.y-y)>=minD*TILE)) return {x,y,c:f.c,r:f.r}; }
   const f=randFloor(); return {x:tcx(f.c),y:tcx(f.r),c:f.c,r:f.r};
 }
 function themeInit(g,idx){
-  g.storm=null; g.hal=null; const d=g.level.def, th=themeOf(d); if(!th||g.vs) return;
+  g.storm=null; g.hal=null; g.xm=null; g.treats=null; const d=g.level.def, th=themeOf(d); if(!th||g.vs) return;
   const chill=save.diff==='chill', L=g.level;
   const avoid=[g.player,g.enemy,{x:tcx(L.exit.c),y:tcx(L.exit.r)}];
   if(th==='storm'){
     const S=g.storm={lvl:L, rain:[], fl:0, flPeak:0, flT:(chill?14:9)+Math.random()*5, thunderT:-1,
       wState:'calm', wT:chill?8:6, dir:1, gustT:0, warnT:0, umb:0, umbs:[], growT:chill?14:9, grown:0, maxGrow:chill?Math.ceil((d.grow||4)/2):(d.grow||4)};
     for(let i=0;i<(d.umbrellas||2);i++){ const s=themeSpot(g,[...avoid,...S.umbs],3); S.umbs.push({x:s.x,y:s.y,taken:false,resp:0,bob:Math.random()*TAU}); }
+  }else if(th==='xmas'){
+    const X=g.xm={lvl:L, men:[], flakes:[]};
+    const n=Math.max(1,(d.snowmen||2)-(chill?1:0));
+    for(let i=0;i<n;i++){ const s=themeSpot(g,[...avoid,...X.men.map(q=>({x:q.hx,y:q.hy}))],4); X.men.push({hx:s.x,hy:s.y,x:s.x,y:s.y,ph:Math.random()*TAU,sp:.45+Math.random()*.25,boo:0}); }
   }else{
     const H=g.hal={lvl:L, ghosts:[], bats:[]};
     const n=Math.max(1,(d.ghosts||2)-(chill?1:0));
     for(let i=0;i<n;i++){ const s=themeSpot(g,[...avoid,...H.ghosts.map(q=>({x:q.hx,y:q.hy}))],4); H.ghosts.push({hx:s.x,hy:s.y,x:s.x,y:s.y,ph:Math.random()*TAU,sp:.55+Math.random()*.3,boo:0}); }
     for(let i=0;i<5;i++) H.bats.push({x:Math.random()*W,y:30+Math.random()*120,ph:Math.random()*TAU,v:(Math.random()<.5?-1:1)*(18+Math.random()*16)});
   }
+  /* bonus treat bags / presents: optional points, never needed to finish */
+  if(d.treats){ const TR=g.treats={lvl:L,list:[],kind:th==='xmas'?'gift':'bag'};
+    for(let i=0;i<d.treats;i++){ const s=themeSpot(g,[...avoid,...TR.list],3); TR.list.push({x:s.x,y:s.y,taken:false,bob:Math.random()*TAU,col:i%3}); } }
 }
 function themeUpdate(g,dt){
   const chill=save.diff==='chill', grid=g.level.grid;
@@ -3129,7 +3150,61 @@ function themeUpdate(g,dt){
         if(dd<30&&dd>0.01){ moveEnt(e,dx/dd*push*dt,dy/dd*push*dt,grid); if(e===g.player&&q.boo<=0){ q.boo=2.5; SFX.sparkle(); } } } }
     for(const b of Hh.bats){ b.ph+=dt*9; b.x+=b.v*dt; if(b.x<-30) b.x=W+30; if(b.x>W+30) b.x=-30; }
   }
+  const X=g.xm;
+  if(X&&X.lvl===g.level){
+    const push=chill?40:58;
+    for(const q of X.men){ q.ph+=dt*q.sp; q.x=q.hx+Math.cos(q.ph)*TILE*1.3; q.y=q.hy+Math.sin(q.ph)*TILE*.7; if(q.boo>0) q.boo-=dt;
+      for(const e of allEnts()){ if(e.caught) continue; const dx=e.x-q.x, dy=e.y-q.y, dd=Math.hypot(dx,dy);
+        if(dd<28&&dd>0.01){ moveEnt(e,dx/dd*push*dt,dy/dd*push*dt,grid); if(e===g.player&&q.boo<=0){ q.boo=2.5; SFX.sparkle(); } } } }
+  }
+  const TR=g.treats;
+  if(TR&&TR.lvl===g.level&&g.player){ for(const it of TR.list){ it.bob+=dt*3; if(it.taken) continue;
+    if(Math.hypot(it.x-g.player.x,it.y-g.player.y)<24){ it.taken=true; SFX.coin(); poof(it.x,it.y,TR.kind==='gift'?'#ff6b6b':'#ff9a2e'); addScore(40,it.x,it.y,TR.kind==='gift'?'PRESENT':'TREATS'); } } }
 }
+function drawCandyCane(c,x,y){ c.save(); c.translate(x,y); c.scale(1.25,1.25);
+  c.fillStyle='rgba(0,0,0,.16)'; c.beginPath(); c.ellipse(0,11,8,3,0,0,TAU); c.fill();
+  c.lineCap='round'; c.lineWidth=5.2; c.strokeStyle='#fdfdfd'; c.beginPath(); c.moveTo(2,10); c.lineTo(2,-4); c.arc(-2.5,-4,4.5,0,Math.PI,true); c.stroke();
+  c.strokeStyle='#e63946'; c.lineWidth=5.2; c.setLineDash([2.4,2.6]); c.beginPath(); c.moveTo(2,10); c.lineTo(2,-4); c.arc(-2.5,-4,4.5,0,Math.PI,true); c.stroke(); c.setLineDash([]);
+  c.strokeStyle='rgba(120,30,40,.55)'; c.lineWidth=.9; c.beginPath(); c.moveTo(4.6,10); c.lineTo(4.6,-4); c.arc(-2.5,-4,7.1,0,Math.PI,true); c.stroke();
+  c.restore(); }
+function drawPresent(c,x,y,col,s){ c.save(); c.translate(x,y); c.scale(s||1,s||1);
+  const box=['#e63946','#2f8f5a','#3d6fd6'][col%3], rib=['#ffd93d','#fff4dc','#ffd93d'][col%3];
+  c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(0,10,12,3.5,0,0,TAU); c.fill();
+  const gr=c.createLinearGradient(-10,-6,10,10); gr.addColorStop(0,box); gr.addColorStop(1,'rgba(0,0,0,.25)');
+  c.fillStyle=box; c.fillRect(-10,-5,20,15); c.fillStyle=gr; c.globalAlpha=.35; c.fillRect(-10,-5,20,15); c.globalAlpha=1;
+  c.fillStyle=box; c.fillRect(-11.5,-9,23,5); c.fillStyle='rgba(255,255,255,.2)'; c.fillRect(-11.5,-9,23,1.6);
+  c.fillStyle=rib; c.fillRect(-2,-9,4,19);
+  c.beginPath(); c.ellipse(-4.5,-11,4.5,2.6,-.5,0,TAU); c.ellipse(4.5,-11,4.5,2.6,.5,0,TAU); c.fill();
+  c.strokeStyle='rgba(60,30,30,.45)'; c.lineWidth=1; c.strokeRect(-10,-5,20,15); c.restore(); }
+function drawTreatBag(c,x,y){ c.save(); c.translate(x,y); c.scale(1.1,1.1);
+  c.fillStyle='rgba(0,0,0,.16)'; c.beginPath(); c.ellipse(0,10,10,3,0,0,TAU); c.fill();
+  c.fillStyle='#f08a24'; c.beginPath(); c.moveTo(-9,-4); c.lineTo(9,-4); c.lineTo(10,9); c.quadraticCurveTo(0,12,-10,9); c.closePath(); c.fill();
+  c.strokeStyle='#7a4a1a'; c.lineWidth=1.6; c.beginPath(); c.arc(0,-4,6,Math.PI,0); c.stroke();
+  c.fillStyle='#5a2e10'; c.beginPath(); c.arc(-3.5,1.5,1.5,0,TAU); c.arc(3.5,1.5,1.5,0,TAU); c.fill();
+  c.beginPath(); c.moveTo(-4,5); c.quadraticCurveTo(0,8.5,4,5); c.quadraticCurveTo(0,6.6,-4,5); c.fill(); c.restore(); }
+function drawSnowman(c,q,t){ const x=q.x, y=q.y+Math.sin(t*2+q.ph)*1.5; c.save();
+  c.fillStyle='rgba(60,80,110,.18)'; c.beginPath(); c.ellipse(x,q.y+15,12,4,0,0,TAU); c.fill();
+  const ball=(yy,r)=>{ const g2=c.createRadialGradient(x-r*.35,yy-r*.35,1,x,yy,r); g2.addColorStop(0,'#ffffff'); g2.addColorStop(1,'#cfdcec'); c.fillStyle=g2; c.beginPath(); c.arc(x,yy,r,0,TAU); c.fill(); c.strokeStyle='rgba(110,130,160,.55)'; c.lineWidth=1; c.stroke(); };
+  ball(y+6,10); ball(y-8,7.5);
+  c.fillStyle='#e63946'; c.fillRect(x-7.5,y-2.5,15,3.2); c.fillRect(x+2,y-1,3.5,7);
+  c.fillStyle='#2a2433'; c.beginPath(); c.arc(x-2.6,y-9.5,1.2,0,TAU); c.arc(x+2.6,y-9.5,1.2,0,TAU); c.arc(x,y+3,1,0,TAU); c.arc(x,y+7,1,0,TAU); c.fill();
+  c.fillStyle='#ff8a2a'; c.beginPath(); c.moveTo(x,y-7.5); c.lineTo(x+6,y-6.5); c.lineTo(x,y-5.8); c.closePath(); c.fill();
+  c.strokeStyle='#2a2433'; c.lineWidth=1; c.beginPath(); c.arc(x,y-6.5,2.6,.3,Math.PI-.3); c.stroke();
+  c.fillStyle='rgba(255,140,170,.55)'; c.beginPath(); c.arc(x-5,y-6.5,1.6,0,TAU); c.arc(x+5,y-6.5,1.6,0,TAU); c.fill();
+  /* little green beanie */
+  c.fillStyle='#2f8f5a'; c.beginPath(); c.arc(x,y-13,6,Math.PI,0); c.fill(); c.fillStyle='#fff'; c.fillRect(x-6.5,y-14,13,2.6); c.beginPath(); c.arc(x,y-19.5,2.2,0,TAU); c.fill();
+  if(q.boo>1.6){ c.font='bold 11px sans-serif'; c.textAlign='center'; c.fillStyle='#2f6b4a'; c.fillText('brrr!',x,y-26); }
+  c.restore(); }
+function drawXmasTree(c,x,y,s,t,k){ c.save(); c.translate(x,y); c.scale(s,s);
+  c.fillStyle='rgba(0,0,0,.15)'; c.beginPath(); c.ellipse(0,13,12,3.5,0,0,TAU); c.fill();
+  c.fillStyle='#7a4a24'; c.fillRect(-2,8,4,5);
+  const tier=(yy,w,col)=>{ c.fillStyle=col; c.beginPath(); c.moveTo(-w,yy); c.quadraticCurveTo(0,yy+3,w,yy); c.lineTo(0,yy-12); c.closePath(); c.fill(); };
+  tier(10,13,'#23663f'); tier(3,11,'#2d7a4b'); tier(-4,8,'#37905a');
+  c.fillStyle='rgba(255,255,255,.85)'; c.fillRect(-9,8.5,4,1.4); c.fillRect(3,1.5,5,1.4); c.fillRect(-4,-5.5,3,1.2);
+  const L=['#ffd93d','#ff6b6b','#5aa9ff','#ff9ec7'];
+  for(let i=0;i<6;i++){ const on=((t*2+i+k)|0)%2===0; c.fillStyle=on?L[i%4]:'rgba(255,255,255,.55)'; c.beginPath(); c.arc(-8+((i*5+k)%16),8-((i*7)%17),1.4,0,TAU); c.fill(); }
+  c.fillStyle='#ffd93d'; c.beginPath(); for(let i=0;i<5;i++){ const a=-Math.PI/2+i*TAU/5, b=a+TAU/10; c.lineTo(Math.cos(a)*3.6,-16+Math.sin(a)*3.6); c.lineTo(Math.cos(b)*1.5,-16+Math.sin(b)*1.5); } c.closePath(); c.fill();
+  c.restore(); }
 /* ---- drawing ---- */
 function drawUmbrella(c,x,y,s){ c.save(); c.translate(x,y); c.scale(s,s);
   c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(0,12,11,3.5,0,0,TAU); c.fill();
@@ -3174,17 +3249,54 @@ const THEME_TINT={};
 function themeTint(kind){ if(THEME_TINT[kind]) return THEME_TINT[kind]; const cv2=document.createElement('canvas'); cv2.width=W/4; cv2.height=H/4; const x=cv2.getContext('2d');
   const gr=x.createLinearGradient(0,0,0,cv2.height);
   if(kind==='storm'){ gr.addColorStop(0,'rgba(20,34,80,.34)'); gr.addColorStop(1,'rgba(30,60,110,.16)'); }
+  else if(kind==='xmas'){ gr.addColorStop(0,'rgba(40,70,130,.16)'); gr.addColorStop(1,'rgba(255,190,120,.10)'); }
   else { gr.addColorStop(0,'rgba(70,30,120,.30)'); gr.addColorStop(.7,'rgba(90,40,120,.12)'); gr.addColorStop(1,'rgba(255,140,50,.18)'); }
   x.fillStyle=gr; x.fillRect(0,0,cv2.width,cv2.height); THEME_TINT[kind]=cv2; return cv2; }
 let themeLastNow=0;
+/* ===== 1-player SIGNATURE ABILITIES (G key / round button) + POWER-UP ORBS ===== */
+const PW1_NAME={boots:'Speed boots',magnet:'Coin magnet',shield:'Bubble shield',coins2:'Double coins'};
+function sigAbility(g){
+  const p=g.player, chill=save.diff==='chill';
+  if(g.mode==='cat'){ g.shieldT=chill?4:3; SFX.open(); ring(p.x,p.y,'#8fd8ff'); poofBig(p.x,p.y,'#d8f3ff'); toast('Tom Shield! Paw bounces right off!',1500); }
+  else { g.fetchT=4; g.dashT=Math.max(g.dashT,1.4); SFX.dash(); trailPoof(p,'#ffd93d'); ring(p.x,p.y,'#ffd93d'); toast('Super Fetch! Zoom, and coins fly to you!',1500); }
+}
+function pwTick(g,dt){
+  const p=g.player, W1=g.pw1; if(!p||W1.lvl!==g.level||g.state!=='play') return;
+  for(const k of ['shieldT','fetchT','p1boost','magT1','coin2T']) if(g[k]>0) g[k]=Math.max(0,g[k]-dt);
+  if(g.shieldT>0){ p.inv=Math.max(p.inv||0,.06);
+    for(const e of [g.enemy,...g.minions]) if(e&&!e.caught&&dist(e,p)<e.radius+p.radius+10&&!(e.stun>0)){ const a=Math.atan2(e.y-p.y,e.x-p.x); moveEnt(e,Math.cos(a)*40,Math.sin(a)*40,g.level.grid); e.stun=1; e.path=null; ring(p.x,p.y,'#8fd8ff'); SFX.boing&&SFX.boing(); } }
+  if(g.fetchT>0||g.magT1>0){ for(const it of g.level.items){ if(it.taken||!(it.kind==='coin'||(it.kind==='fish'&&g.mode==='cat'))) continue; const d=Math.hypot(it.x-p.x,it.y-p.y);
+      if(d<170&&d>2){ const v=Math.min(d,300*dt); it.x+=(p.x-it.x)/d*v; it.y+=(p.y-it.y)/d*v; it.c=tx(it.x); it.r=tx(it.y); } } }
+  W1.t-=dt;
+  if(W1.t<=0&&W1.list.filter(o=>!o.taken).length<2){ W1.t=(save.diff==='chill'?9:12)+Math.random()*4;
+    const types=g.mode==='cat'?['boots','magnet','shield','coins2']:['boots','magnet','coins2'];
+    const s=themeSpot(g,[g.player,g.enemy],4); W1.list=W1.list.filter(o=>!o.taken); W1.list.push({x:s.x,y:s.y,sid:types[(Math.random()*types.length)|0],taken:false,bob:0,life:20}); poofBig(s.x,s.y,'#ffffff'); SFX.sparkle&&SFX.sparkle(); }
+  for(const o of W1.list){ if(o.taken) continue; o.bob+=dt*3; o.life-=dt; if(o.life<=0){ o.taken=true; poof(o.x,o.y,'#ffffff'); continue; }
+    if(Math.hypot(o.x-p.x,o.y-p.y)<26){ o.taken=true; SFX.open(); poofBig(o.x,o.y,'#ffd93d'); ring(p.x,p.y,'#ffd93d');
+      if(o.sid==='boots') g.p1boost=6; else if(o.sid==='magnet') g.magT1=7; else if(o.sid==='shield') g.shieldT=5; else g.coin2T=10;
+      toast(PW1_NAME[o.sid]+'!',1400); } }
+}
+function pwDraw(g){ const W1=g.pw1; if(W1.lvl!==g.level) return; for(const o of W1.list) if(!o.taken){ if(o.life<4&&((o.life*6)|0)%2) continue; vxDrawPU(cx,o,-Math.abs(Math.sin(o.bob))*3); } }
+function pwOverlay(g){
+  const p=g.player; if(!p||g.pw1.lvl!==g.level) return; const t=g.time||0, S=polEntScale();
+  if(g.shieldT>0){ const a=g.shieldT<1?.5+.5*Math.sin(t*20):1; cx.save(); cx.globalAlpha=.85*a; const gr=cx.createRadialGradient(p.x-6,p.y-10,4,p.x,p.y-4,28*S);
+    gr.addColorStop(0,'rgba(255,255,255,.05)'); gr.addColorStop(.8,'rgba(140,210,255,.25)'); gr.addColorStop(1,'rgba(120,200,255,.6)'); cx.fillStyle=gr; cx.beginPath(); cx.arc(p.x,p.y-4,28*S,0,TAU); cx.fill();
+    cx.strokeStyle='rgba(255,255,255,.9)'; cx.lineWidth=2; cx.beginPath(); cx.arc(p.x,p.y-4,28*S,-2.4,-1.6); cx.stroke(); cx.restore(); }
+  if(g.fetchT>0||g.magT1>0){ cx.save(); cx.strokeStyle='rgba(255,217,61,.55)'; cx.lineWidth=2; for(let k=0;k<3;k++){ const r=((t*60+k*40)%120)+20; cx.globalAlpha=1-r/140; cx.beginPath(); cx.arc(p.x,p.y,r,0,TAU); cx.stroke(); } cx.restore(); }
+  if(g.p1boost>0&&Math.random()<.5&&g.particles.length<160) g.particles.push({x:p.x,y:p.y+10,vx:0,vy:0,life:.35,max:.35,col:'#ff8a3d',size:5});
+  /* little timer chips for the active power-ups */
+  const act=[['shieldT','shield'],['p1boost','boots'],['magT1','magnet'],['coin2T','coins2'],['fetchT','magnet']].filter(q=>g[q[0]]>0);
+  let x0=W-48; for(const [k,sid] of act){ vxDrawPU(cx,{x:x0,y:112,sid},0); cx.fillStyle='#3b2e4a'; cx.font='bold 12px sans-serif'; cx.textAlign='center'; cx.fillText(Math.ceil(g[k])+'s',x0,138); x0-=44; }
+}
+function themeTintUnder(g){ if(g.storm&&g.storm.lvl===g.level) cx.drawImage(themeTint('storm'),0,0,W,H); if(g.hal&&g.hal.lvl===g.level) cx.drawImage(themeTint('halloween'),0,0,W,H); if(g.xm&&g.xm.lvl===g.level) cx.drawImage(themeTint('xmas'),0,0,W,H); }
 function themeDrawItems(g){
   const S=g.storm; if(S&&S.lvl===g.level) for(const u of S.umbs) if(!u.taken) drawUmbrella(cx,u.x,u.y-Math.sin(u.bob)*2,1.15);
+  const TR=g.treats; if(TR&&TR.lvl===g.level) for(const it of TR.list) if(!it.taken){ const yy=it.y-Math.abs(Math.sin(it.bob))*3; if(TR.kind==='gift') drawPresent(cx,it.x,yy,it.col,1.05); else drawTreatBag(cx,it.x,yy); }
 }
 function themeOverlay(g){
   const now=performance.now(), rdt=Math.min(.05,Math.max(0,(now-themeLastNow)/1000)); themeLastNow=now; const t=g.time, chill=save.diff==='chill';
   const S=g.storm, Hh=g.hal;
   if(S&&S.lvl===g.level){
-    cx.drawImage(themeTint('storm'),0,0,W,H);
     /* rain: capped, cheap straight streaks */
     const cap=(POL.rsCap&&POL.rsCap<1.5)?40:(chill?55:80);
     while(S.rain.length<cap) S.rain.push({x:Math.random()*(W+80)-40,y:Math.random()*H,v:520+Math.random()*220,l:9+Math.random()*7});
@@ -3208,7 +3320,6 @@ function themeOverlay(g){
     if(S.umb>0){ drawUmbrella(cx,g.player.x+10,g.player.y-30,.9); }
   }
   if(Hh&&Hh.lvl===g.level){
-    cx.drawImage(themeTint('halloween'),0,0,W,H);
     /* moon over the top-right hedge, with a soft glow */
     const mx=Math.round(W*.68), my=24; const mg=cx.createRadialGradient(mx,my,6,mx,my,46); mg.addColorStop(0,'rgba(255,240,190,.55)'); mg.addColorStop(1,'rgba(255,240,190,0)');
     cx.fillStyle=mg; cx.beginPath(); cx.arc(mx,my,46,0,TAU); cx.fill(); cx.fillStyle='#fff3c4'; cx.beginPath(); cx.arc(mx,my,15,0,TAU); cx.fill();
@@ -3216,14 +3327,29 @@ function themeOverlay(g){
     for(const b of Hh.bats) drawBat(cx,b);
     for(const q of Hh.ghosts) drawGhost(cx,q,t);
   }
+  const X=g.xm;
+  if(X&&X.lvl===g.level){
+    for(const q of X.men) drawSnowman(cx,q,t);
+    /* twinkly string lights along the top */
+    const LC=['#ffd93d','#ff6b6b','#6fcf6f','#5aa9ff','#ff9ec7']; cx.strokeStyle='rgba(40,60,50,.75)'; cx.lineWidth=1.5; cx.beginPath();
+    for(let x=0;x<=W;x+=8){ const y=6+Math.abs(Math.sin(x/60*Math.PI))*10; if(x===0) cx.moveTo(x,y); else cx.lineTo(x,y); } cx.stroke();
+    for(let i=0,x=30;x<W;x+=60,i++){ const y=6+Math.abs(Math.sin(x/60*Math.PI))*10+4; const on=((t*1.5+i)|0)%3!==0; cx.fillStyle=on?LC[i%5]:'rgba(255,255,255,.4)';
+      if(on){ cx.globalAlpha=.3; cx.beginPath(); cx.arc(x,y,7,0,TAU); cx.fill(); cx.globalAlpha=1; } cx.beginPath(); cx.ellipse(x,y,3,4.2,0,0,TAU); cx.fill(); }
+    /* gentle snowfall */
+    const cap=(POL.rsCap&&POL.rsCap<1.5)?35:(chill?45:60);
+    while(X.flakes.length<cap) X.flakes.push({x:Math.random()*W,y:Math.random()*H,v:28+Math.random()*30,r:1.2+Math.random()*2,ph:Math.random()*TAU});
+    cx.fillStyle='rgba(255,255,255,.9)'; cx.beginPath();
+    for(const f of X.flakes){ f.y+=f.v*rdt; f.ph+=rdt*1.5; f.x+=Math.sin(f.ph)*12*rdt; if(f.y>H+4){ f.y=-4; f.x=Math.random()*W; } cx.moveTo(f.x+f.r,f.y); cx.arc(f.x,f.y,f.r,0,TAU); }
+    cx.fill();
+  }
 }
 /* wins: own records, stickers, costume prizes */
 function themeOnWin(g,stars){
   const th=themeOf(g.level&&g.level.def); if(!th||g.vs||g.customPlay) return;
-  const rec=themeRec()[th], k=g.mode+(g.levelIdx-(th==='storm'?49:53));
+  const n=g.levelIdx-themeBase(th), rec=themeRec()[th], k=g.mode+n;
   rec.wins=(rec.wins|0)+1; rec.stars[k]=Math.max(rec.stars[k]|0,stars|0);
-  const n=g.levelIdx-(th==='storm'?49:53);
-  earnSticker((th==='storm'?'storm':'hal')+n, th==='storm'?'Storm sticker!':'Halloween sticker!');
+  earnSticker((th==='storm'?'storm':(th==='xmas'?'xmas':'hal'))+n, th==='storm'?'Storm sticker!':(th==='xmas'?'Christmas sticker!':'Halloween sticker!'));
+  if(th==='xmas'){ for(const w of ['cat','dog']) if(!save.skins[w].includes('santa')) save.skins[w].push('santa'); if(!save.__santaToast){ save.__santaToast=1; setTimeout(()=>toast('Costume unlocked: Santa Hat for Tom and Paw! See the Wardrobe.',3200),2400); } }
   if(th==='halloween'&&n>=1&&!save.skins.cat.includes('witch')){ save.skins.cat.push('witch'); setTimeout(()=>toast('Costume unlocked: Witch Tom! See the Wardrobe.',3000),2400); }
   if(th==='halloween'&&n>=3&&!save.skins.dog.includes('pumpkin')){ save.skins.dog.push('pumpkin'); setTimeout(()=>toast('Costume unlocked: Pumpkin Paw! See the Wardrobe.',3000),5600); }
   persist();
@@ -4169,16 +4295,18 @@ function startLevel(idx,custom){
     for(const k of['fence','bush','pud'])if(g.blocks[k])g.blocks[k]=Math.max(1,g.blocks[k]+df.blockDelta);
     if(save.gear.hole)g.blocks.hole=1;
     g.ab={a:{ic:'dash',kb:'SPACE',cd:0,max:6*df.cdMul,name:'Dash'},b:{ic:'puff',kb:'Q',cd:0,max:14*df.cdMul,name:'Puff'}};
+    if(!g.vs) g.ab.g={ic:'shieldab',kb:'G',cd:0,max:(save.diff==='chill'?12:16)*df.cdMul,name:'Tom Shield'};
   }else{
     g.player=makeEnt(tcx(E.c),tcx(E.r),'dog'); g.enemy=makeEnt(tcx(P.c),tcx(P.r),'cat');
     g.enemy.fences=3+Math.floor(idx/3)+df.aiFences;
     g.blocks={};
     g.ab={a:{ic:'dash',kb:'SPACE',cd:0,max:5*df.cdMul,name:'Sprint'},b:{ic:'bark',kb:'Q',cd:0,max:10*df.cdMul,name:'Bark'},c:{ic:'sniff',kb:'R',cd:0,max:12*df.cdMul,name:'Sniff'}};
+    if(!g.vs) g.ab.g={ic:'fetch',kb:'G',cd:0,max:(save.diff==='chill'?11:14)*df.cdMul,name:'Super Fetch'};
     // dog mode: remove fish, cat AI doesn't collect (2P keeps them for the human Tom)
     if(!g.vs) g.level.items=g.level.items.filter(i=>i.kind!=='fish');
  }
  g.player.lastDx=1;g.player.lastDy=0;
- g.dashT=0;
+ g.dashT=0; g.shieldT=0; g.fetchT=0; g.p1boost=0; g.magT1=0; g.coin2T=0; g.pw1=(g.ab&&g.ab.g)?{list:[],t:6+Math.random()*3,lvl:g.level}:null;
  /* spawn safety net: never let anyone start embedded in a solid tile */
  for(const e of[g.player,g.enemy]){
  const ec=clamp(tx(e.x),0,COLS-1),er=clamp(tx(e.y),0,ROWS-1);
@@ -4256,6 +4384,7 @@ function startLevel(idx,custom){
  if(d.web){
  const slot=g.mode==='cat'?'c':'d';
     g.ab[slot]={ic:'web',kb:'F',cd:0,max:2.6*df.cdMul,name:'Web Zip'};
+    if(Object.keys(g.ab).length>4) delete g.ab.g;   /* keep the phone button row from overflowing */
   }
   /* volcano gear + eruption cycle */
   if(d.lava){
@@ -4295,7 +4424,7 @@ function startLevel(idx,custom){
   document.getElementById('abilitybar').classList.remove('hidden');
   document.getElementById('buildbar').classList.toggle('hidden',g.mode!=='cat'||!!d.duel);
  /* TWISTS — random remix so no level plays the same way twice */
- if(!g.vs&&!g.endless&&!custom&&!d.boss&&!d.max&&!d.duel&&!d.king&&!d.cboss&&!d.rescue&&!d.moonfair&&!d.storm&&!d.halloween&&idx>0){
+ if(!g.vs&&!g.endless&&!custom&&!d.boss&&!d.max&&!d.duel&&!d.king&&!d.cboss&&!d.rescue&&!d.moonfair&&!d.storm&&!d.halloween&&!d.xmas&&idx>0){
  const chill=(save.diff==='chill');
     const TW=chill?['speedy','slippery','windy','none','none','none']:['swarm','speedy','critters','slippery','foggy','windy','none'];
     const tw=TW[Math.floor(Math.random()*TW.length)];
@@ -4368,7 +4497,7 @@ function updateGoalBox(){
     if(g.level&&g.level.def&&g.level.def.parade)
       el.innerHTML=g.exitOpen?'HOME is OPEN — race in!':('Tickets: '+g.fishGot+'/3 · then HOME!');
     else
-      el.innerHTML=g.exitOpen?'The door is open — run home!':(g.level.biome.halloween?'Candy corn '+g.fishGot+' / 3 <span class="then">then the door</span>':'<i class="ic-fish"></i> '+g.fishGot+' / 3 <span class="then">then the door</span>');
+      el.innerHTML=g.exitOpen?'The door is open — run home!':(g.level.biome.halloween?'Candy corn '+g.fishGot+' / 3 <span class="then">then the door</span>':g.level.biome.xmas?'Candy canes '+g.fishGot+' / 3 <span class="then">then the door</span>':'<i class="ic-fish"></i> '+g.fishGot+' / 3 <span class="then">then the door</span>');
   }else{
     const total=1+g.minions.filter(m=>m.kind==='cat'&&!m.caught).length;
     el.innerHTML=total>1?('Catch all '+total+' cats!'):'Catch the cat!';
@@ -4400,9 +4529,9 @@ function handleActionKeys(k){
     if(k==='3')selectBlock('pud'); if(k==='4')selectBlock('toy');
     if(k==='5')selectBlock('hole');
     if(k==='e')placeFacing();
-    if(k===' ')useAbility('a'); if(k==='q')useAbility('b');
+    if(k===' ')useAbility('a'); if(k==='q')useAbility('b'); if(k==='g')useAbility('g');
   }else{
-    if(k===' ')useAbility('a'); if(k==='q')useAbility('b'); if(k==='r')useAbility('c');
+    if(k===' ')useAbility('a'); if(k==='q')useAbility('b'); if(k==='r')useAbility('c'); if(k==='g')useAbility('g');
   }
 }
 function selectBlock(key){ if(game.blocks[key]===undefined)return; game.buildSel=key; refreshBuildBar(); }
@@ -4460,6 +4589,7 @@ function useAbility(slot){
   ab.cd=ab.max;
   if(ab.name==='Throw'){ if(!throwFlower())ab.cd=.15; return; }
   if(ab.name==='Web Zip'){ if(!doZip())ab.cd=.6; return; }
+  if(slot==='g'){ sigAbility(g); return; }
   if(g.duel&&ab.name==='Dash'){ g.dashT=1.1; SFX.dash(); trailPoof(g.player,'#ffd93d'); return; }
   if(g.mode==='cat'){
     if(slot==='a'){g.dashT=1.1;SFX.dash();trailPoof(g.player,'#ffd93d');}
@@ -4577,7 +4707,7 @@ function update(dt){
       }
     }
   }else{
-    const spd=(g.vs?(p.kind==='cat'?1.0:1.1)*vxSpdMul(p):(p.kind==='cat'?1.05:1.0*dogBoost()))*(g.dashT>0?1.85:1)*terrainSpeed(p)*zombieSlowMul()*sockSlowMul()*160*dt;
+    const spd=(g.vs?(p.kind==='cat'?1.0:1.1)*vxSpdMul(p):(p.kind==='cat'?1.05:1.0*dogBoost()))*(g.dashT>0?1.85:1)*(g.p1boost>0&&!g.vs?1.3:1)*terrainSpeed(p)*zombieSlowMul()*sockSlowMul()*160*dt;
     const onIce=tileUnder(p)===T.ICE;
     if(onIce){ p.vx=lerp(p.vx,a.x*spd,.06); p.vy=lerp(p.vy,a.y*spd,.06); }
     else{ p.vx=a.x*spd; p.vy=a.y*spd; }
@@ -4670,7 +4800,8 @@ function update(dt){
       }
     }
   }
-  if(g.storm||g.hal) themeUpdate(g,dt);
+  if(g.storm||g.hal||g.xm||g.treats) themeUpdate(g,dt);
+  if(g.pw1) pwTick(g,dt);
   /* bounce clouds: step on one and ZOOM */
   p.bounceCd=Math.max(0,(p.bounceCd||0)-dt);
   if(tileUnder(p)===T.BOUNCE&&p.bounceCd<=0){
@@ -4697,7 +4828,7 @@ function update(dt){
     if(it.taken)continue;
     it.bob+=dt*3;
     if(dist(it,p)<24){
-      if(it.kind==='coin'){it.taken=true;g.coinsGot+=2;save.coins+=2;SFX.coin();poof(it.x,it.y,'#ffd93d');addScore(5,it.x,it.y);refreshCoinChips();polFlyCoin(it.x,it.y);}
+      if(it.kind==='coin'){it.taken=true;const c2=(g.coin2T>0&&!g.vs)?2:1;g.coinsGot+=2*c2;save.coins+=2*c2;SFX.coin();poof(it.x,it.y,'#ffd93d');addScore(5,it.x,it.y);refreshCoinChips();polFlyCoin(it.x,it.y);}
       else if(it.kind==='flower'){it.taken=true;SFX.fish();poof(it.x,it.y,'#ffb1c9');addScore(15,it.x,it.y,'FLOWER');polSparkle(it.x,it.y,'#ffc6da',8);
         if(g.duel){g.duel.ammo++;
           if(g.duel.phase==='collect'&&!g.level.items.some(i=>i.kind==='flower'&&!i.taken)){
@@ -4705,8 +4836,8 @@ function update(dt){
             toast('ALL FLOWERS! Now THROW them at the boss — SPACE or click!',3000);
           }else updateGoalBox();
         }}
-      else if(it.kind==='fish'&&p.kind==='cat'){it.taken=true;g.fishGot++;SFX.fish();poof(it.x,it.y,'#9ad0ff');addScore(25,it.x,it.y,g.level.biome.halloween?'CANDY':'FISH');polFishPop(it.x,it.y);
-        if(g.vs&&vxIsFish()){VS.sc[0]++;it.resp=1.2;} else if(g.fishGot>=(g.vs&&VS.gm==='coop'?(VS.coopNeed||3):3)){g.exitOpen=true;SFX.open();toast(g.vs&&VS.gm==='coop'?'All the fish! The door is open. Both run home!':'The exit door is OPEN! Run!');ring(tcx(g.level.exit.c),tcx(g.level.exit.r),'#ffd93d');}
+      else if(it.kind==='fish'&&p.kind==='cat'){it.taken=true;g.fishGot++;SFX.fish();poof(it.x,it.y,'#9ad0ff');addScore(25,it.x,it.y,g.level.biome.halloween?'CANDY':(g.level.biome.xmas?'CANDY CANE':'FISH'));polFishPop(it.x,it.y);
+        if(g.vs&&vxIsFish()){const pt=vxFishPts(0);VS.sc[0]+=pt;if(pt>1)vxSay('a','Catch-up! {w} got DOUBLE fish!');it.resp=1.2;} else if(g.fishGot>=(g.vs&&VS.gm==='coop'?(VS.coopNeed||3):3)){g.exitOpen=true;SFX.open();toast(g.vs&&VS.gm==='coop'?'All the fish! The door is open. Both run home!':'The exit door is OPEN! Run!');ring(tcx(g.level.exit.c),tcx(g.level.exit.r),'#ffd93d');}
         updateGoalBox();}
       else if(it.kind==='heart'){it.taken=true;SFX.fish();poofBig(it.x,it.y,'#ff8fa5');
  if(g.duel&&g.duel.myHearts<3){g.duel.myHearts++;toast('+1 heart! You have '+g.duel.myHearts+'.');}
@@ -5264,6 +5395,7 @@ function drawTileArt(t,c,r,x,y,bi,g,dyn){
     switch(t){
       case T.WALL:{
         if(bi.halloween&&r>0&&(c*7+r*13)%13===0){ drawJackO(cx,x+TILE/2,y+TILE/2,.6,true); }
+        if(bi.xmas){ cx.fillStyle='rgba(255,255,255,.92)'; rr(x+1,y,TILE-2,7,3.5); cx.fill(); if(r>0&&(c*7+r*13)%11===0) drawPresent(cx,x+TILE/2,y+TILE/2+3,(c+r)%3,.85); }
         if(bi.name==='Spider Grove'&&(c*7+r*13)%4===0){
           cx.strokeStyle='rgba(240,240,255,.5)'; cx.lineWidth=1.2;
           cx.beginPath();cx.arc(x+2,y+2,9,0,Math.PI/2);cx.stroke();
@@ -5273,6 +5405,7 @@ function drawTileArt(t,c,r,x,y,bi,g,dyn){
         break;}
       case T.CRATE:{
         if(bi.halloween){ drawJackO(cx,x+TILE/2,y+TILE/2+2,1.05,true); break; }
+        if(bi.xmas){ drawPresent(cx,x+TILE/2,y+TILE/2+2,(c*3+r)%3,1.35); break; }
         cx.fillStyle='#c98b4b'; rr(x+3,y+3,TILE-6,TILE-6,6); cx.fill();
         cx.strokeStyle='#8a5a33'; cx.lineWidth=3; rr(x+3,y+3,TILE-6,TILE-6,6); cx.stroke();
         cx.beginPath();cx.moveTo(x+6,y+6);cx.lineTo(x+TILE-6,y+TILE-6);cx.moveTo(x+TILE-6,y+6);cx.lineTo(x+6,y+TILE-6);cx.stroke();
@@ -5282,6 +5415,7 @@ function drawTileArt(t,c,r,x,y,bi,g,dyn){
           cx.fillStyle='rgba(0,0,0,0.14)'; blob(x+TILE/2+1,y+TILE/2+8,14);
           cx.fillStyle='#3f7d34'; blob(x+TILE/2,y+TILE/2+3,14); cx.fillStyle='#57a046'; blob(x+TILE/2-8,y+TILE/2-2,8); blob(x+TILE/2+9,y+TILE/2,7);
           drawJackO(cx,x+TILE/2-6,y+TILE/2+4,.55,false); drawJackO(cx,x+TILE/2+8,y+TILE/2+7,.45,false); break; }
+        if(bi.xmas){ drawXmasTree(cx,x+TILE/2,y+TILE/2,1.25,0,c+r); break; }
         cx.fillStyle='rgba(0,0,0,0.12)'; blob(x+TILE/2+1,y+TILE/2+8,14);
         const bg=cx.createRadialGradient(x+TILE/2-4,y+TILE/2-4,2,x+TILE/2,y+TILE/2+2,16);
         bg.addColorStop(0,'#6ed06f'); bg.addColorStop(1,'#2f8a38');
@@ -5382,7 +5516,7 @@ function drawTileArt(t,c,r,x,y,bi,g,dyn){
     }
 }
 function drawItemsAndRest(g,bi,grid,rdt){
-  if(g.storm) themeDrawItems(g);
+  if(g.storm||g.treats) themeDrawItems(g);
   /* scent trail (visible when playing dog, or sniffing) */
   if(g.mode==='dog'||g.sniffT>0){
     for(const s of g.scent){
@@ -5412,7 +5546,7 @@ function drawItemsAndRest(g,bi,grid,rdt){
     }
     else if(it.kind==='flower')drawPickupFlower(cx,it.x,it.y+b);
     else if(it.kind==='heart')drawPickupHeart(cx,it.x,it.y+b);
-    else if(it.kind==='fish'){ if(bi.halloween) drawCandyCorn(cx,it.x,it.y+b); else drawPickupFish(cx,it.x,it.y+b); }
+    else if(it.kind==='fish'){ if(bi.halloween) drawCandyCorn(cx,it.x,it.y+b); else if(bi.xmas) drawCandyCane(cx,it.x,it.y+b); else drawPickupFish(cx,it.x,it.y+b); }
     else if(it.kind==='sticker')drawPickupSticker(cx,it.x,it.y+b);
     else if(it.kind==='ticket')drawPickupTicket(cx,it.x,it.y+b);
     else if(it.kind==='pu')vxDrawPU(cx,it,b);
@@ -5529,6 +5663,8 @@ function drawItemsAndRest(g,bi,grid,rdt){
   if(g.zombie) drawZombieWorld();
   if(g.socks) drawSockWorld();
   if(g.mouse) drawMouseWorld();
+  if(g.storm||g.hal||g.xm) themeTintUnder(g);
+  if(g.pw1) pwDraw(g);
   /* entities: draw cat & dog (order by y for a hint of depth) */
   if(g.vs&&VS.gm==='build') vxDrawBuilt(cx);
   const ents=[g.player,g.enemy,...g.minions].filter(e=>!e.caught).sort((a,b)=>a.y-b.y);
@@ -5561,7 +5697,8 @@ function drawItemsAndRest(g,bi,grid,rdt){
   if(g.donut) drawDonutOverlay();
   if(g.zombie) drawZombieOverlay();
   if(g.mouse) drawMouseOverlay();
-  if(g.storm||g.hal) themeOverlay(g);
+  if(g.storm||g.hal||g.xm) themeOverlay(g);
+  if(g.pw1) pwOverlay(g);
   /* sniff reveal: outline cat through everything */
   if(g.mode==='dog'&&g.sniffT>0&&!g.enemy.caught){
     cx.strokeStyle='rgba(80,190,90,.9)';cx.lineWidth=3;
@@ -6053,7 +6190,7 @@ function drawCatHeadReal(c,P,moving,p,lod,skin){
   for(const a of[-1,1.5]){ c.beginPath(); c.moveTo(11,3+a*.4); c.quadraticCurveTo(5,3+a,0,5+a*1.4); c.stroke(); }
 }
 /* accessories in head-local coords (skins stay wearable) */
-window.__crAccessory=function(c,kind,skin){
+window.__crAccessoryRaw=function(c,kind,skin){
   if(skin==='pirate'){
     c.fillStyle='#2a2433'; c.beginPath(); c.moveTo(-12,-9); c.lineTo(12,-11); c.lineTo(-1,-26); c.closePath(); c.fill();
     c.fillStyle='#fff'; c.beginPath(); c.arc(-1,-15,2,0,TAU); c.fill();
@@ -6074,6 +6211,15 @@ window.__crAccessory=function(c,kind,skin){
     c.strokeStyle='#3b2e4a'; c.lineWidth=.8; c.beginPath(); c.moveTo(-6,2); c.lineTo(-3,4); c.lineTo(-6,6); c.stroke();
   }else if(skin==='candy'){
     c.fillStyle='#ff4d88'; c.beginPath(); c.arc(-4,-12,3,0,TAU); c.fill(); c.fillStyle='#fff'; c.beginPath(); c.arc(-4,-12,1.2,0,TAU); c.fill();
+  }else if(skin==='santa'){
+    c.save(); c.translate(-1,-9); c.scale(1.45,1.45); c.translate(1,9);
+    /* cozy Santa hat: red velvet cone flopping back, fluffy white trim + pom-pom */
+    const sg=c.createLinearGradient(-8,-26,8,-10); sg.addColorStop(0,'#ff4d4d'); sg.addColorStop(1,'#b81d2a'); c.fillStyle=sg;
+    c.beginPath(); c.moveTo(-10,-11); c.quadraticCurveTo(-6,-26,4,-28); c.quadraticCurveTo(-3,-23,-2,-17); c.lineTo(10,-11); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(4,-28); c.quadraticCurveTo(-8,-28,-14,-20); c.lineTo(-11,-18); c.quadraticCurveTo(-5,-24,2,-24); c.closePath(); c.fill();
+    c.fillStyle='#fdfbf6'; c.beginPath(); c.ellipse(0,-11,11.5,3.4,-.05,0,TAU); c.fill(); c.beginPath(); c.arc(-14,-19,3.4,0,TAU); c.fill();
+    c.fillStyle='rgba(200,200,215,.6)'; c.beginPath(); c.ellipse(1,-10,9,1.2,0,0,TAU); c.fill();
+    c.restore();
   }else if(skin==='witch'){
     c.save(); c.translate(-1,-9); c.scale(1.3,1.3); c.translate(1,9);
     /* cute witch hat: tall bendy cone, orange band, wide brim */
@@ -6093,6 +6239,12 @@ window.__crAccessory=function(c,kind,skin){
   }else if(skin==='snow'){
     c.fillStyle='rgba(126,200,240,.85)'; c.beginPath(); c.moveTo(-10,-6); c.lineTo(8,-6); c.lineTo(6,-1); c.lineTo(-8,-1); c.closePath(); c.fill();
   }
+};
+/* in-play: costume hats read too small, so draw them bigger when the animal is drawn at game size */
+window.__crAccessory=function(c,kind,skin){
+  const a=c.getTransform?Math.hypot(c.getTransform().a,c.getTransform().b):1, hat=['witch','pumpkin','santa','pirate','candy'].includes(skin);
+  if(hat&&a<0.9){ c.save(); c.translate(0,-6); c.scale(1.3,1.3); c.translate(0,6); window.__crAccessoryRaw(c,kind,skin); c.restore(); }
+  else window.__crAccessoryRaw(c,kind,skin);
 };
 /* Super cape behind the body (drawn before the animal) */
 function crCape(c,kind,p,moving,col){
@@ -6326,6 +6478,15 @@ function refreshCoinChips(){
 function drawUiIcon(ctx,x,y,kind,sz){
   const s=sz||40; ctx.save(); ctx.translate(x,y); ctx.scale(s/40,s/40);
   ctx.lineCap='round'; ctx.lineJoin='round';
+  if(kind==='shieldab'){ const gr=ctx.createLinearGradient(0,-14,0,14); gr.addColorStop(0,'#bfe9ff'); gr.addColorStop(1,'#4fa3e0'); ctx.fillStyle=gr; ctx.strokeStyle='#2c5f8a'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(0,-15); ctx.quadraticCurveTo(9,-11,13,-11); ctx.quadraticCurveTo(13,6,0,15); ctx.quadraticCurveTo(-13,6,-13,-11); ctx.quadraticCurveTo(-9,-11,0,-15); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(0,2,4,3.4,0,0,TAU); ctx.fill(); for(const [dx,dy] of [[-5,-4],[-1.8,-6.5],[1.8,-6.5],[5,-4]]){ ctx.beginPath(); ctx.arc(dx,dy,1.7,0,TAU); ctx.fill(); }
+    ctx.restore(); return; }
+  if(kind==='fetch'){ ctx.fillStyle='#ffd93d'; ctx.strokeStyle='#8a6a10'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(4,4,7,0,TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle='#fff3b0'; ctx.beginPath(); ctx.arc(2,2,2.5,0,TAU); ctx.fill();
+    ctx.strokeStyle='#ff8a3d'; ctx.lineWidth=3; for(const k of [0,1,2]){ ctx.beginPath(); ctx.moveTo(-14,-8+k*7); ctx.lineTo(-5,-6+k*5); ctx.stroke(); }
+    ctx.fillStyle='#f4ead6'; ctx.strokeStyle='#8a6a40'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.ellipse(6,-11,8,2.6,-.3,0,TAU); ctx.fill(); ctx.stroke();
+    ctx.restore(); return; }
   if(kind==='fence'){
     /* wooden fence */
     ctx.fillStyle='#8a5a33';
@@ -6483,10 +6644,12 @@ const WORLDS=[
   {name:'World 12 — Moon Fair',   from:45,to:48},
   {name:'World 13 — Storm Sky',   from:49,to:52},
   {name:'World 14 — Pumpkin Night',from:53,to:56},
+  {name:'World 15 — Candy Hollow',from:57,to:60},
+  {name:'World 16 — Snowy Christmas',from:61,to:64},
 ];
 function levelUnlocked(i){
   if(i>=16&&i<=22&&!save.gear.shield)return false;       // volcano needs the shield
-  if(i===49||i===53) return true;                         // Storm Sky + Pumpkin Night: open from the start
+  if(i===49||i===53||i===57||i===61) return true;      /* holiday worlds (Halloween + Christmas) start open */                         // Storm Sky + Pumpkin Night: open from the start
   if(i===23||i===27||i===30||i===32||i===35||i===38||i===42||i===45)return starsFor(game.mode,15)>0;   // bonus worlds after Candy Boss
   return i===0||starsFor(game.mode,i-1)>0;               // beat the previous level
 }
@@ -6498,7 +6661,7 @@ function levelStarGoalPreview(mode,i){
   if(L.king) return '3* beat the king';
   if(L.boss||L.cboss) return '3* beat the boss';
   if(L.max) return '3* beat MAX army';
-  if(mode==='cat') return L.halloween?'3* candy + star door':'3* fish + star door';
+  if(mode==='cat') return L.xmas?'3* candy canes + star door':L.halloween?'3* candy + star door':'3* fish + star door';
   return '3* catch fast';
 }
 function openLevels(){
@@ -6540,8 +6703,8 @@ function openLevels(){
 }
 /* ---- wardrobe ---- */
 const SKINS={
-  cat:[{id:'classic',name:'Tabby',price:0},{id:'pirate',name:'Pirate Cat',price:120},{id:'ninja',name:'Ninja Cat',price:250},{id:'snow',name:'Snowball',price:80},{id:'candy',name:'Candy Cat',price:180},{id:'witch',name:'Witch Tom',price:150},{id:'super',name:'SUPER CAT',price:300}],
-  dog:[{id:'classic',name:'Buddy',price:0},{id:'snow',name:'Snowy',price:80},{id:'pirate',name:'Pirate Dog',price:120},{id:'robot',name:'Robo-Dog',price:120},{id:'candy',name:'Candy Dog',price:180},{id:'pumpkin',name:'Pumpkin Paw',price:150},{id:'ninja',name:'Ninja Dog',price:250},{id:'super',name:'SUPER DOG',price:300}],
+  cat:[{id:'classic',name:'Tabby',price:0},{id:'pirate',name:'Pirate Cat',price:120},{id:'ninja',name:'Ninja Cat',price:250},{id:'snow',name:'Snowball',price:80},{id:'candy',name:'Candy Cat',price:180},{id:'witch',name:'Witch Tom',price:150},{id:'santa',name:'Santa Tom',price:100},{id:'super',name:'SUPER CAT',price:300}],
+  dog:[{id:'classic',name:'Buddy',price:0},{id:'snow',name:'Snowy',price:80},{id:'pirate',name:'Pirate Dog',price:120},{id:'robot',name:'Robo-Dog',price:120},{id:'candy',name:'Candy Dog',price:180},{id:'pumpkin',name:'Pumpkin Paw',price:150},{id:'santa',name:'Santa Paw',price:100},{id:'ninja',name:'Ninja Dog',price:250},{id:'super',name:'SUPER DOG',price:300}],
 };
 function openWardrobe(){
   for(const kind of['cat','dog']){
@@ -7732,7 +7895,7 @@ function polEntScale(){ const b=document.body.classList; return b.contains('tabl
 /* ---- ambient life per world (capped, allocation-free in steady state) ---- */
 function polAmbKind(bi){
   const n=bi.name;
-  if(bi.storm) return 'cloud'; if(bi.halloween) return 'firefly';
+  if(bi.storm) return 'cloud'; if(bi.halloween) return 'firefly'; if(bi.xmas) return 'snow';
   if(bi.ice) return 'snow'; if(/Volcano/.test(n)) return 'ember'; if(bi.candy||/Moon/.test(n)) return 'sparkle';
   if(/Waterline|Laundry/.test(n)) return 'bubble'; if(/Night|Sewer|Zombie/.test(n)) return 'firefly';
   if(/Sky/.test(n)) return 'cloud'; if(/Forest|Spider|Park|City/.test(n)) return 'leafbug';
@@ -8397,7 +8560,7 @@ function vsUpdateRemote(dt){
   for(const it of g.level.items){
     if(it.taken||dist(it,e)>=24)continue;
     if(it.kind==='coin'){ it.taken=true; SFX.coin(); poof(it.x,it.y,'#ffd93d'); VS.evq.push(['C']); }
-    else if(it.kind==='fish'&&e.kind==='cat'){ it.taken=true; g.fishGot++; SFX.fish(); poof(it.x,it.y,'#9ad0ff'); if(vxIsFish()){ VS.sc[1]++; it.resp=1.2; }
+    else if(it.kind==='fish'&&e.kind==='cat'){ it.taken=true; g.fishGot++; SFX.fish(); poof(it.x,it.y,'#9ad0ff'); if(vxIsFish()){ const pt=vxFishPts(1); VS.sc[1]+=pt; if(pt>1) vxSay('b','Catch-up! {w} got DOUBLE fish!'); it.resp=1.2; }
       if((VS.gm==='chase'&&g.fishGot>=3||VS.gm==='coop'&&g.fishGot>=(VS.coopNeed||3))&&!g.exitOpen){ g.exitOpen=true; SFX.open(); ring(tcx(g.level.exit.c),tcx(g.level.exit.r),'#ffd93d'); toast('Tom opened the door! Guard it!'); }
       updateGoalBox(); }
     else if(it.kind==='power'){ it.taken=true; SFX.fish(); if(e.kind==='cat'){ e.inv=6; poofBig(e.x,e.y,'#ffffff'); } else { VS.rsniff=Math.max(VS.rsniff,5); VS.rdash=1.4; poofBig(e.x,e.y,'#ffd93d'); } }
@@ -8651,10 +8814,10 @@ window.__vsTest={
 /*VS-END*/
 /*VSPLUS-BEGIN*/
 /* ===== 2 Players, part two: game types, rounds, power-ups, fairness, emotes, lobby, same-device ===== */
-const VX_MODES=[['chase','Chase','Tom grabs 3 fish and runs home. Paw guards!'],['fish','Fish Race','Two cats! Most fish in 60 seconds wins.'],['tag','Tag, You\u2019re It','Tag to pass it on. Least time being IT wins.'],['build','Build Battle','Build walls to block your friend. Most fish wins!'],['coop','Co-op Rescue','One team! Get the fish, then both reach the door.']];
+const VX_MODES=[['chase','Chase','Tom grabs 3 fish and runs home. Paw guards!'],['fish','Fish Race','Two cats! Most fish in 60 seconds wins.'],['tag','Tag, You\u2019re It','Tag to pass it on. Least time being IT wins.'],['build','Build Battle','Build walls to block your friend. Most fish wins!'],['coop','Co-op Rescue','One team! Get the fish, then both reach the door.'],['lucky','Catch-Up Race','Fish race where whoever is behind gets DOUBLE fish. Great for big and little siblings!']];
 const VX_TEAMS=[['mix','Tom and Paw'],['tt','Two Toms'],['pp','Two Paws']];
-const VX_PU=['boots','snow','ghost','magnet','decoy'];
-const VX_PUNAME={boots:'Speed boots',snow:'Freeze snowball',ghost:'Ghost walk',magnet:'Fish magnet',decoy:'Decoy'};
+const VX_PU=['boots','snow','ghost','magnet','decoy','shield'];
+const VX_PUNAME={boots:'Speed boots',snow:'Freeze snowball',ghost:'Ghost walk',magnet:'Fish magnet',decoy:'Decoy',shield:'Bubble shield'};
 const VX_FAIR=[['auto','Auto'],['even','Even'],['me','Help me'],['friend','Help friend']];
 const VX_EMO=['Wave','Heart','Good game!','Laugh'];
 Object.assign(VS,{gm:'chase',bestOf:1,puOn:true,fair:'auto',arena:-1,sc:[0,0],itT:[0,0],it:'b',ser:{n:1,a:0,b:0,r:1},streak:{a:0,b:0},hcap:{a:1,b:1},
@@ -8663,7 +8826,9 @@ Object.assign(VS,{gm:'chase',bestOf:1,puOn:true,fair:'auto',arena:-1,sc:[0,0],it
 const VX_ARENAS=[
  {name:'Twin Gardens',base:0,half:['############','#...........','#....b..##..','#.##.....#..','#.#..f......','#...###..b..','#.f.....#...','#.Pb..f.#..X','#.f.....#...','#...###..b..','#.#..f......','#.##.....#..','#.....b.##..','#...........','############']},
  {name:'Ice Mirror',base:5,half:['############','#...........','#...iiii....','#...i..#....','#.f.i..#.f..','#...........','#.##..ii..##','#Pf...ii..fX','#.##..ii..##','#...........','#.f.i..#.f..','#...i..#....','#...iiii....','#.....b.....','############']},
- {name:'Candy Cross',base:10,half:['############','#.....#.....','#.....#..f..','#..##...##..','#..#..f..#..','#.....##....','#.f.#....b..','#.P.#..f...X','#.f.#....b..','#.....##....','#..#..f..#..','#..##...##..','#.....#..f..','#.....#.....','############']}
+ {name:'Candy Cross',base:10,half:['############','#.....#.....','#.....#..f..','#..##...##..','#..#..f..#..','#.....##....','#.f.#....b..','#.P.#..f...X','#.f.#....b..','#.....##....','#..#..f..#..','#..##...##..','#.....#..f..','#.....#.....','############']},
+ {name:'Pumpkin Patch',base:53,half:['############','#...........','#..b...#....','#.##..f#..b.','#.....##....','#.f.b.....f.','#...##..#...','#P..f...#..X','#...##..#...','#.f.b.....f.','#.....##....','#.##..f#..b.','#..b...#....','#...........','############']},
+ {name:'Snowy Village',base:61,half:['############','#...........','#.b...ii....','#.##..ii.#..','#..f.....#f.','#....##.....','#.f..#..ii..','#P...#.f.i.X','#.f..#..ii..','#....##.....','#..f.....#f.','#.##..ii.#..','#.b...ii....','#...........','############']}
 ];
 function vxMine(){ return VS.role==='join'?'b':'a'; }
 function vxSideOf(e){ const g=game; return e===g.player?vxMine():(vxMine()==='a'?'b':'a'); }
@@ -8735,7 +8900,7 @@ function vxFreeSpot(minD){
 function vxSetupMode(){
   const g=game,host=VS.role==='host';
   VS.sc=[0,0]; VS.itT=[0,0]; VS.tagCd=1.5; VS.puT=6+Math.random()*3; VS.decoy=null; VS.emo={}; VS.lastGoal='';
-  for(const e of [g.player,g.enemy]){ e.boostT=0; e.ghostT=0; e.magT=0; e.frozeT=0; e.fxb=0; e.bub=false; e.home=false; e.bubT=0; }
+  for(const e of [g.player,g.enemy]){ e.shT=0; e.boostT=0; e.ghostT=0; e.magT=0; e.frozeT=0; e.fxb=0; e.bub=false; e.home=false; e.bubT=0; }
   g.minions=[]; VS.bw={}; VS.sealT=[0,0]; VS.coopFrees=0;
   if(!host) return;
   if(VS.arena>=0) vxApplyArena();
@@ -8765,7 +8930,7 @@ function vxSpdMul(e){
   return m;
 }
 function vxFxBits(e){
-  let b=0; if(e.bub)b|=32; if(e.home)b|=64; if(e.boostT>0)b|=1; if(e.ghostT>0)b|=2; if(e.magT>0)b|=4; if(e.frozeT>0)b|=8;
+  let b=0; if(e.bub)b|=32; if(e.home)b|=64; if(e.boostT>0)b|=1; if(e.ghostT>0)b|=2; if(e.magT>0)b|=4; if(e.frozeT>0)b|=8; if(e.shT>0)b|=128;
   if(VS.gm==='tag'&&((VS.it==='a'&&e===game.player)||(VS.it==='b'&&e===game.enemy))) b|=16;
   return b;
 }
@@ -8783,7 +8948,7 @@ function vxJoinEvent(ev){
 /* ---------- host: power-ups (every mode) ---------- */
 function vxPowerTick(dt){
   const g=game,p=g.player,e=g.enemy;
-  for(const q of [p,e]){ q.boostT=Math.max(0,(q.boostT||0)-dt); q.ghostT=Math.max(0,(q.ghostT||0)-dt); q.magT=Math.max(0,(q.magT||0)-dt); q.frozeT=Math.max(0,(q.frozeT||0)-dt);
+  for(const q of [p,e]){ q.boostT=Math.max(0,(q.boostT||0)-dt); q.ghostT=Math.max(0,(q.ghostT||0)-dt); q.magT=Math.max(0,(q.magT||0)-dt); q.frozeT=Math.max(0,(q.frozeT||0)-dt); q.shT=Math.max(0,(q.shT||0)-dt); if(q.shT>0&&q.kind==='cat') q.inv=Math.max(q.inv||0,.06);
     if(q.ghostT<=0&&q.wasGhost){ q.wasGhost=false; } if(q.ghostT>0) q.wasGhost=true; }
   if(VS.decoy){ const d=VS.decoy; d.t-=dt; d.anim+=dt*10;
     const nx=d.x+d.vx*dt, ny=d.y+d.vy*dt;
@@ -8795,7 +8960,7 @@ function vxPowerTick(dt){
   VS.puT-=dt;
   if(VS.puT<=0){ VS.puT=9+Math.random()*4;
     const slot=g.level.items.find(i=>i.kind==='pu'&&i.taken);
-    if(slot){ const s=vxFreeSpot(4); const types=VX_PU.filter(t=>t!=='magnet'||vxIsFish());
+    if(slot){ const s=vxFreeSpot(4); const types=VX_PU.filter(t=>(t!=='magnet'||vxIsFish())&&(t!=='shield'||VS.gm==='chase'||VS.gm==='coop'));
       slot.c=s.c; slot.r=s.r; slot.x=tcx(s.c); slot.y=tcx(s.r); slot.sid=types[Math.floor(Math.random()*types.length)]; slot.taken=false; slot.bob=0;
       poofBig(slot.x,slot.y,'#ffffff'); SFX.sparkle&&SFX.sparkle(); } }
   for(const it of g.level.items){ if(it.kind!=='pu'||it.taken) continue;
@@ -8808,6 +8973,7 @@ function vxApplyPU(q,type,it){
   if(type==='boots'){ q.boostT=5; vxSay(side,'{w} got Speed boots!'); }
   else if(type==='snow'){ other.stun=Math.max(other.stun||0,1.6); other.frozeT=1.6; ring(other.x,other.y,'#9ad8ff'); poofBig(other.x,other.y,'#e6f6ff'); vxSay(side,'{w} threw a Freeze snowball!'); }
   else if(type==='ghost'){ q.ghostT=4; vxSay(side,'{w} can walk through walls!'); }
+  else if(type==='shield'){ q.shT=4; vxSay(side,'{w} got a Bubble shield!'); }
   else if(type==='magnet'){ q.magT=6; vxSay(side,'{w} got a Fish magnet!'); }
   else if(type==='decoy'){ const a=Math.random()*TAU; VS.decoy={x:q.x,y:q.y,kind:q.kind,skin:q===g.player?(q.kind==='cat'?save.skinCat:save.skinDog):(q.skin||'classic'),vx:Math.cos(a)*120,vy:Math.sin(a)*120,t:4,anim:0,face:1,side}; vxSay(side,'{w} made a Decoy!'); }
 }
@@ -8865,7 +9031,7 @@ function vxShowEnd(m){
   const sc=m.sc||[0,0], mS=sc[mine==='a'?0:1], oS=sc[mine==='a'?1:0];
   const it=m.itT||[0,0], mI=it[mine==='a'?0:1], oI=it[mine==='a'?1:0];
   let line='';
-  if(gm==='fish'||gm==='build') line=VS.local?('Fish: Player 1 '+sc[0]+' \u2013 Player 2 '+sc[1]):('Fish: You '+mS+' \u2013 Friend '+oS);
+  if(gm==='fish'||gm==='build'||gm==='lucky') line=VS.local?('Fish: Player 1 '+sc[0]+' \u2013 Player 2 '+sc[1]):('Fish: You '+mS+' \u2013 Friend '+oS);
   else if(gm==='tag') line=VS.local?('Time being IT: Player 1 '+Math.round(it[0])+'s \u2013 Player 2 '+Math.round(it[1])+'s'):('Time being IT: You '+Math.round(mI)+'s \u2013 Friend '+Math.round(oI)+'s');
   else line=m.tom?(m.why==='home'?'Tom made it home!':'Tom stayed safe until time ran out!'):'Paw caught Tom!';
   const youWon=m.win===mine;
@@ -8882,9 +9048,9 @@ function vxShowEnd(m){
   let prize=0;
   if(m.over){ prize=youWon||(S.n>1&&S[mine]>S[oth])?4:3; save.coins+=prize; earnSticker('twoPlayer','Play Together sticker!'); persist(); refreshCoinChips(); }
   $('vsEndTitle').textContent=title; $('vsEndLine').textContent=line;
-  $('vsEndYou').textContent=m.over?('+'+prize+' coins for playing together!'+(VS.coinsHere?' ('+VS.coinsHere+' more from the level)':'')):(gm==='fish'||gm==='build'?'Next round coming up!':'Next round: sides swap!');
+  $('vsEndYou').textContent=m.over?('+'+prize+' coins for playing together!'+(VS.coinsHere?' ('+VS.coinsHere+' more from the level)':'')):(gm==='fish'||gm==='build'||gm==='lucky'?'Next round coming up!':'Next round: sides swap!');
   $('vsEndWait').textContent=m.over?'':'Get ready...';
-  $('vsRematch').style.display=m.over?'':'none'; $('vsSwap').style.display=m.over&&gm!=='fish'&&gm!=='build'?'':'none';
+  $('vsRematch').style.display=m.over?'':'none'; $('vsSwap').style.display=m.over&&gm!=='fish'&&gm!=='build'&&gm!=='lucky'?'':'none';
   $('vsRematch').textContent=S.n>1?'New series':'Rematch'; $('vxToLobby').style.display=m.over?'':'none';
   document.getElementById('scr-vsend').classList.toggle('vx-champ',!!(m.over&&S.n>1));
   setPlayingUI(false);
@@ -9008,7 +9174,7 @@ function vxDrawPU(c,it,b){
   c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(x,y+13,11,4,0,0,TAU); c.fill();
   const gl=c.createRadialGradient(x,y,2,x,y,19); gl.addColorStop(0,'rgba(255,255,255,.95)'); gl.addColorStop(1,'rgba(255,255,255,0)');
   c.fillStyle=gl; c.beginPath(); c.arc(x,y,19+2*Math.sin(t*5),0,TAU); c.fill();
-  const col={boots:'#ff8a3d',snow:'#7fc8ff',ghost:'#c9b8ff',magnet:'#ff5d73',decoy:'#7ad97a'}[it.sid]||'#ffd93d';
+  const col={boots:'#ff8a3d',snow:'#7fc8ff',ghost:'#c9b8ff',magnet:'#ff5d73',decoy:'#7ad97a',shield:'#5fb6f0',coins2:'#ffc928'}[it.sid]||'#ffd93d';
   c.fillStyle=col; c.strokeStyle='#3b2e4a'; c.lineWidth=2.2; c.beginPath(); c.arc(x,y,15,0,TAU); c.fill(); c.stroke();
   c.translate(x,y); c.scale(1.2,1.2); c.lineWidth=1.5; c.strokeStyle='#3b2e4a'; c.fillStyle='#fff';
   if(it.sid==='boots'){ c.beginPath(); c.moveTo(-4,-6); c.lineTo(1,-6); c.lineTo(1,1); c.lineTo(6,2); c.lineTo(6,5); c.lineTo(-4,5); c.closePath(); c.fill(); c.stroke();
@@ -9017,6 +9183,8 @@ function vxDrawPU(c,it,b){
   else if(it.sid==='ghost'){ c.beginPath(); c.moveTo(-6,6); c.lineTo(-6,-1); c.arc(0,-1,6,Math.PI,0); c.lineTo(6,6); c.lineTo(3,4); c.lineTo(0,6); c.lineTo(-3,4); c.closePath(); c.fill(); c.stroke();
     c.fillStyle='#3b2e4a'; c.beginPath(); c.arc(-2,-1,1.2,0,TAU); c.arc(2,-1,1.2,0,TAU); c.fill(); }
   else if(it.sid==='magnet'){ c.lineWidth=4; c.strokeStyle='#fff'; c.beginPath(); c.arc(0,-1,5,Math.PI,0,true); c.stroke(); c.lineWidth=4; c.strokeStyle='#3b2e4a'; c.beginPath(); c.moveTo(-5,-1); c.lineTo(-5,4); c.moveTo(5,-1); c.lineTo(5,4); c.stroke(); }
+  else if(it.sid==='shield'){ c.beginPath(); c.moveTo(0,-7); c.quadraticCurveTo(5,-5,7,-5); c.quadraticCurveTo(7,3,0,8); c.quadraticCurveTo(-7,3,-7,-5); c.quadraticCurveTo(-5,-5,0,-7); c.closePath(); c.fill(); c.stroke(); }
+  else if(it.sid==='coins2'){ c.fillStyle='#fff6c8'; c.beginPath(); c.arc(-2,1,5.5,0,TAU); c.fill(); c.stroke(); c.fillStyle='#3b2e4a'; c.font='bold 8px system-ui,sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('x2',3.5,-3.5); }
   else { c.globalAlpha=.9; c.beginPath(); c.ellipse(-2,1,5,4,0,0,TAU); c.fill(); c.stroke(); c.beginPath(); c.arc(4,-3,3,0,TAU); c.fill(); c.stroke(); c.fillStyle='#3b2e4a'; c.font='bold 8px system-ui,sans-serif'; c.textAlign='center'; c.fillText('?',-2,4); }
   c.restore();
 }
@@ -9029,6 +9197,7 @@ function vxDrawEntFx(e){
     c.fillStyle='rgba(255,255,255,.8)'; c.beginPath(); c.ellipse(e.x-r*.45,e.y-2-r*.45,r*.18,r*.1,-.7,0,TAU); c.fill(); }
   if(b&64){ c.fillStyle='rgba(255,217,61,.35)'; c.beginPath(); c.arc(e.x,e.y,24*S+3*Math.sin(t*5),0,TAU); c.fill(); }
   if(b&16){ c.strokeStyle='rgba(255,70,100,'+(.65+.3*Math.sin(t*8))+')'; c.lineWidth=4; c.beginPath(); c.ellipse(e.x,e.y+14*S,22*S,8*S,0,0,TAU); c.stroke(); }
+  if(b&128){ c.save(); c.strokeStyle='rgba(120,200,255,.9)'; c.fillStyle='rgba(150,215,255,.22)'; c.lineWidth=3; c.beginPath(); c.arc(e.x,e.y-4,26*S,0,TAU); c.fill(); c.stroke(); c.restore(); }
   if(b&8){ c.fillStyle='rgba(170,220,255,.45)'; c.strokeStyle='rgba(255,255,255,.9)'; c.lineWidth=2; c.beginPath(); c.roundRect?c.roundRect(e.x-20*S,e.y-26*S,40*S,46*S,8):c.rect(e.x-20*S,e.y-26*S,40*S,46*S); c.fill(); c.stroke(); }
   if(b&1&&e.moving){ c.strokeStyle='rgba(255,138,61,.8)'; c.lineWidth=3; const d=-(e.face||1); for(let k=0;k<3;k++){ c.beginPath(); c.moveTo(e.x+d*(16+k*2)*S,e.y+(-6+k*7)*S); c.lineTo(e.x+d*(28+k*4)*S,e.y+(-6+k*7)*S); c.stroke(); } }
   if(b&4){ c.strokeStyle='rgba(255,93,115,.55)'; c.lineWidth=2; for(let k=0;k<2;k++){ const r=(24+((t*40+k*14)%28))*S; c.globalAlpha=1-((t*40+k*14)%28)/28; c.beginPath(); c.arc(e.x,e.y,r,0,TAU); c.stroke(); } c.globalAlpha=1; }
@@ -9200,7 +9369,8 @@ function vxLocalOpen(){
 /*VXMORE-BEGIN*/
 /* ===== 2 Players, part three: Build Battle + Co-op Rescue ===== */
 const VX_WALL_LIFE=8, VX_SEAL_MAX=2.5, VX_SEAL_AREA=30;
-function vxIsFish(){ return VS.gm==='fish'||VS.gm==='build'; }
+function vxIsFish(){ return VS.gm==='fish'||VS.gm==='build'||VS.gm==='lucky'; }
+function vxFishPts(i){ return (VS.gm==='lucky'&&VS.sc[i]+2<=VS.sc[1-i])?2:1; }
 /* [host role, partner role] for the current game type */
 function vxRoles(){
   const gm=VS.gm;
