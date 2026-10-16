@@ -431,7 +431,13 @@
     { id: 'crab',     name: 'Crab Cracker',    desc: 'Beat Robo-Crab' },
     { id: 'stars3',   name: 'Three Star Hero', desc: 'Get 3 stars on a level' },
     { id: 'story',    name: 'City Saver',      desc: 'Finish Story mode' },
-    { id: 'maker',    name: 'Artist',          desc: 'Make your own hero' }
+    { id: 'maker',    name: 'Artist',          desc: 'Make your own hero' },
+    // round 12: 2 Player + web rescue medals
+    { id: 'vswin',    name: 'Head to Head',    desc: 'Win a 2 Player match' },
+    { id: 'vschamp',  name: 'Champion',        desc: 'Win a best-of-3 series' },
+    { id: 'vstag',    name: 'Tag Master',      desc: 'Win a game of TAG' },
+    { id: 'webres',   name: 'Web Lifeline',    desc: 'Rescue someone with a web-pull' },
+    { id: 'longres',  name: 'Long Shot',       desc: 'Do a long-range web rescue' }
   );
 
   /* =====================================================================
@@ -468,12 +474,12 @@
       buddy: [ROSA.heart.id, ROSA.sister.id, 'rocky-web'] },
     // ---- round 10 BONUS WORLD: Sky Islands (levels 15-20). bosses: [...] = fight them one after another
     { name: 'Cloud Hop',         zone: 6, goal: 'stars',  target: 40,  bonus: { time: 80 },   enemies: ['bird', 'drone'], diff: 0.35, story: 'skyIntro' },
-    { name: 'Catch ' + HN + '!', zone: 6, goal: 'reach',  target: 900, bonus: { time: 70 },   enemies: ['drone', 'bird', 'goon'], diff: 0.4, story: 'skyRace', after: 'skyRaceEnd', buddy: [ROSA.heart.id] },
+    { name: 'Catch ' + HN + '!', zone: 6, goal: 'reach',  target: 900, bonus: { time: 70 },   enemies: ['drone', 'bird', 'goon'], diff: 0.4, story: 'skyRace', after: 'skyRaceEnd', buddy: [ROSA.heart.id], buddyAhead: true },
     { name: 'Island Rescue',     zone: 6, goal: 'rescue', target: 3,   bonus: { stars: 30 },  enemies: ['bird', 'goon', 'saw'], diff: 0.45, story: 'skyRescue', rescues: true, pets: true, bigbot: 5200 },
-    { name: 'Double Trouble',    zone: 6, goal: 'crab',   target: 2,   bonus: { stars: 20 },  enemies: ['drone', 'bird'], diff: 0.4, story: 'double', after: 'doubleAfter', bosses: ['spotty', 'queen'] },
-    { name: 'Boss Rush',         zone: 6, goal: 'crab',   target: 4,   bonus: { stars: 30 },  enemies: ['drone'], diff: 0.4, story: 'rush', bosses: ['crab', 'ovals', 'heart', 'hulk'] },
+    { name: 'Double Trouble',    zone: 6, goal: 'crab',   target: 2,   bonus: { stars: 20 },  enemies: ['drone', 'bird'], diff: 0.4, story: 'double', after: 'doubleAfter', bosses: ['spotty', 'queen'], bossHp: 0.75, bossGap: 900 },
+    { name: 'Boss Rush',         zone: 6, goal: 'crab',   target: 4,   bonus: { stars: 30 },  enemies: ['drone'], diff: 0.4, story: 'rush', bosses: ['crab', 'ovals', 'heart', 'hulk'], bossHp: 0.45, bossGap: 700 },
     { name: 'Scribble King 2.0', zone: 6, goal: 'king',   target: 1,   bonus: { stars: 30 },  enemies: ['drone', 'bird', 'goon'], diff: 0.5, story: 'king2', after: 'king2End', kingHp: 1.6,
-      buddy: ['red', 'shadow', ROSA.sister.id, 'rocky-web'] }
+      buddy: ['red', 'shadow', ROSA.sister.id, 'rocky-web', ROSA.heart.id] }
   ];
   var WORLD2 = 14;   // first Sky Islands level index
   // Sky Parade job sizes per difficulty (Easy is kid-fair)
@@ -1185,6 +1191,10 @@
       var w = rand(130 - d * 20, 260 - d * 60);
       var h = rand(150, 370);
       var nb = makeBuilding(world.nextBuildingX, w, h);
+      if (world.nextBuildingX > 1200 && Math.random() < 0.12) {   // bounce pad, sometimes with a secret star arc way up high
+        nb.pad = true;
+        if (Math.random() < 0.6) for (var ss = 0; ss < 7; ss++) world.stars.push({ x: nb.x + nb.w / 2 + (ss - 3) * 55, y: nb.top - 640 - Math.cos((ss - 3) / 3) * 90, spin: ss, secret: true });
+      }
       world.buildings.push(nb);
       placeRescueStuff(nb);
       // gaps get wider the further you go
@@ -1193,6 +1203,7 @@
     while (world.nextAnchorX < toX) {
       var x = world.nextAnchorX, d2 = difficulty(x);
       var a = { x: x, y: GROUND_Y - rand(440, 610), bob: Math.random() * 6.28 };
+      if (x > 1500 && Math.random() < 0.16) { a.balloon = true; a.bx = a.x; a.by = a.y; a.amp = rand(60, 120); a.sp = rand(0.6, 1.1); a.col = ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff', '#ff8ab3'][Math.floor(Math.random() * 5)]; }
       world.anchors.push(a);
       // stars along the swing path under this anchor
       if (Math.random() < 0.75) {
@@ -1596,6 +1607,11 @@
       var b = world.buildings[i];
       if (hero.x + R * 0.6 < b.x || hero.x - R * 0.6 > b.x + b.w || hero.y + R < b.top) continue;
       if (prevY + R <= b.top + 4 && hero.vy >= 0) {
+        if (b.pad && !hero.climbing) {   // bounce pad: BOING up to the secret stars
+          hero.y = b.top - R; hero.vy = -1450; hero.airborne = true; hero.squash = 1; hero.rope = null;
+          popup(hero.x, hero.y - 50, 'BOING!', '#ff8ab3'); sfx('roll'); b.padT = 0.4;
+          continue;
+        }
         if (mod('bouncy') && hero.vy > 260 && !hero.climbing) {   // EVERYTHING IS BOUNCY
           hero.y = b.top - R; hero.vy = -Math.min(1100, hero.vy * 0.78); hero.airborne = true; hero.squash = 1;
           if (Math.random() < 0.3) popup(hero.x, hero.y - 50, 'BOING!', '#ff8ab3');
@@ -1677,6 +1693,8 @@
       var d = Math.hypot(t.x - hd.x, t.y - hd.y) - (t.bolt ? 120 : 0) - (t.big ? 60 : 0);
       if (d < bestD) { bestD = d; best = t; }
     });
+    var pt = !hero.carry && pullTarget(760);
+    if (pt && (!best || pt.d < bestD + 80)) { webPull(pt.c); return; }   // web-pull rescue
     var dx = 1, dy = -0.12;
     if (best) {
       var lead = Math.hypot(best.x - hd.x, best.y - hd.y) / TUNING.webBallSpeed;
@@ -2304,6 +2322,7 @@
   function releaseAll() {   // drop every held swing / charge (window lost focus, pointer left, capture lost...)
     var had = Object.keys(input.roles).some(function (k) { return input.roles[k] === 'fire'; }) || input.charging;
     input.roles = {};
+    if (game && game.versus && game.versus.p) game.versus.p.forEach(function (p) { p.held = false; });
     try { canvas.releasePointerCapture && Object.keys(capturedPointers).forEach(function (id) { if (canvas.hasPointerCapture && canvas.hasPointerCapture(+id)) canvas.releasePointerCapture(+id); }); } catch (e) { /* ignore */ }
     capturedPointers = {};
     if (input.held || hero.rope) release();
@@ -2325,6 +2344,8 @@
     if (game.state === 'settings') { settingsPress(px, py, tap); return; }
     if (game.state === 'credits') { game.state = 'settings'; sfx('select'); return; }
     if (game.state === 'fun') { funPress(px, py); return; }
+    if (game.state === 'vsSetup') { if (tap) vsSetupPress(px, py); else startVersus(); return; }
+    if (game.state === 'vsEnd') { if (tap) vsEndPress(px, py); else if (game.overTime > 0.8) startVersus(); return; }
     if (game.state === 'shop') {
       var S = shopLayout();
       if (!tap || inRect(px, py, S.back)) { game.state = 'title'; sfx('select'); return; }
@@ -2372,12 +2393,20 @@
     if (input.roles[id] !== undefined) pointerEnd({ pointerId: id, cancelable: false });
     if (e.pointerType === 'mouse') Object.keys(input.roles).forEach(function (k) { if (+k !== id) pointerEnd({ pointerId: +k, cancelable: false }); });   // one mouse = one pointer
     if (game.state === 'title' && canFullscreen() && inRect(x, y, fullscreenButtonRect())) { input.roles[id] = 'ui'; toggleFullscreen(); return; }
+    if (game.state === 'play' && game.versus) {
+      if (inRect(x, y, pauseButtonRect())) { input.roles[id] = 'ui'; pause(true); return; }
+      vsPointer(id, x, y); return;
+    }
     if (game.state === 'play') {
       if (game.tutorial) { input.roles[id] = 'ui'; dismissTutorial(); return; }
       if (onPowerButton(x, y)) { input.roles[id] = 'ui'; usePower(); return; }
       if (onFlyButton(x, y)) { input.roles[id] = 'ui'; toggleFly(); return; }
       if (onFireButton(x, y)) { input.roles[id] = 'fire'; startCharge(); return; }
       if (inRect(x, y, pauseButtonRect())) { input.roles[id] = 'ui'; pause(true); return; }
+      if (!hero.carry && !game.versus) {   // tap right on someone in need = web-pull them
+        var tc = null; world.citizens.forEach(function (c) { if ((c.state === 'ledge' || c.state === 'fall') && Math.hypot(SX(c.x) - x * uiDiv / uiDiv, SY(c.y) - y) < 60) tc = c; });
+        if (tc && Math.hypot(tc.x - hero.x, tc.y - hero.y) < 1100) { input.roles[id] = 'ui'; webPull(tc); return; }
+      }
       if (swingFingers() > 0) { input.roles[id] = 'fire'; startCharge(); return; }   // second finger = shoot
       var nowT = performance.now() / 1000;   // double-tap = Web Zip
       if (game.power === 'zip' && nowT - (input.lastTapT || 0) < 0.3 && hero.powerCool <= 0) { input.lastTapT = 0; input.roles[id] = 'ui'; usePower(); return; }
@@ -2395,6 +2424,7 @@
     delete capturedPointers[e.pointerId];
     var role = input.roles[e.pointerId];
     delete input.roles[e.pointerId];
+    if (role && role.slice && role.slice(0, 2) === 'vs') vsRelease(role);
     if (role === 'swing' && swingFingers() === 0) release();
     if (role === 'fire') releaseCharge();
   }
@@ -2429,6 +2459,14 @@
       return;
     }
     if (e.code === 'Escape' && game.state === 'story') { endStory(); return; }
+    if (game.versus && game.state === 'play') {   // 2P keys
+      var V2 = game.versus;
+      if (e.code === 'Space' || e.code === 'KeyW') { e.preventDefault(); V2.p[0].held = true; return; }
+      if (e.code === 'Enter' || e.code === 'ArrowUp') { e.preventDefault(); V2.p[1].held = true; return; }
+      if (e.code === 'KeyF') { if (!e.repeat) vsFire(0); return; }
+      if (e.code === 'KeyL') { if (!e.repeat) vsFire(1); return; }
+    }
+    if (e.code === 'Escape' && (game.state === 'vsSetup' || game.state === 'vsEnd')) { endVersus(); game.state = 'title'; return; }
     if (e.code === 'KeyZ' || e.code === 'KeyC') { if (!e.repeat) usePower(); return; }
     if (game.state === 'title' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
       var i = characterIndex() + (e.code === 'ArrowLeft' ? -1 : 1);
@@ -2443,6 +2481,11 @@
   });
   window.addEventListener('keyup', function (e) {
     if (game.state === 'maker') return;
+    if (game.versus) {
+      if (e.code === 'Space' || e.code === 'KeyW') { game.versus.p[0].held = false; return; }
+      if (e.code === 'Enter' || e.code === 'ArrowUp') { game.versus.p[1].held = false; return; }
+      if (e.code === 'KeyF' || e.code === 'KeyL') return;
+    }
     if (e.code === 'KeyF' || e.code === 'KeyX') { releaseCharge(); return; }
     if (WEB_KEYS[e.code]) { e.preventDefault(); release(); }
   });
@@ -2474,6 +2517,13 @@
   function withUI(fn) { var was = !!uiSaved; beginUI(); try { return fn(); } finally { if (!was) endUI(); } }
 
   function updateCamera(dt, snap) {
+    if (game && game.versus && game.versus.p) {   // frame both players
+      var A = game.versus.p[0].h, B = game.versus.p[1].h, lo = Math.min(A.x, B.x), hi = Math.max(A.x, B.x);
+      var vtx = (lo + hi) / 2 - viewW * 0.45, vty = Math.min(GROUND_Y + 50 - viewH, Math.min(A.y, B.y) - viewH * 0.3);
+      if (!isFinite(vtx) || !isFinite(vty)) return;
+      cam.x += (vtx - cam.x) * Math.min(1, snap ? 1 : dt * 6); cam.y += (vty - cam.y) * Math.min(1, snap ? 1 : dt * 4);
+      return;
+    }
     var tx = hero.x - viewW * (world.crab || world.finalBoss ? 0.25 : 0.33);   // boss arena: give the boss room
     var groundTop = GROUND_Y + 50 - viewH;
     var ty = Math.min(groundTop, hero.y - viewH * 0.3);
@@ -2539,6 +2589,14 @@
     var x = SX(b.x), w = b.w * scale;
     if (x > screenW || x + w < 0) return;
     drawRoofExtras(b, x, SY(b.top), w);
+    if (b.pad) {   // springy bounce pad
+      var pw = Math.min(w * 0.7, 90 * scale), px = x + (w - pw) / 2, py = SY(b.top), sq = b.padT > 0 ? 0.5 : 1;
+      if (b.padT > 0) b.padT -= 1 / 60;
+      ctx.strokeStyle = '#8a92a6'; ctx.lineWidth = 3; ctx.beginPath();
+      for (var z = 0; z < 4; z++) { ctx.moveTo(px + pw * 0.2, py - z * 5 * scale * sq); ctx.lineTo(px + pw * 0.8, py - (z + 0.5) * 5 * scale * sq); }
+      ctx.stroke(); ctx.fillStyle = '#ff4f9a'; roundRect(px, py - 24 * scale * sq, pw, 8 * scale, 4 * scale); ctx.fill();
+      text('BOING', px + pw / 2, py - 34 * scale, Math.max(10, 12 * scale), '#ff4f9a', 'center', '900');
+    }
   }
   function drawBuildingBody(b) {
     var x = SX(b.x), y = SY(b.top);
@@ -2622,6 +2680,12 @@
 
   function drawAnchor(a, t, isTarget) {
     if (!onScreen(a.x, a.y, 60)) return;
+    if (a.balloon) {   // moving balloon anchor
+      var bx = SX(a.x), by = SY(a.y);
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by - 30 * scale); ctx.stroke();
+      ctx.fillStyle = a.col; ctx.beginPath(); ctx.ellipse(bx, by - 52 * scale, 22 * scale, 27 * scale, 0, 0, 6.283); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(bx - 8 * scale, by - 60 * scale, 6 * scale, 0, 6.283); ctx.fill();
+    }
     var x = SX(a.x), y = SY(a.y + Math.sin(t * 2 + a.bob) * 3);
     if (isTarget) {
       ctx.strokeStyle = 'rgba(255,255,255,' + (0.5 + 0.4 * Math.sin(t * 8)) + ')';
@@ -3481,10 +3545,11 @@
     drawBoss(t);
     drawFinalBoss(t);
     drawCrab(t);
-    drawWeb();
+    vsEach(drawWeb);
+    if (game.versus) drawVsPickups(t);
     drawGhost(t);
     drawBuddy(t);
-    if (game.state === 'play' || game.state === 'paused' || game.state === 'levelEnd' || (game.state === 'over' && game.overTime < 0.15)) drawHero(t);
+    if (game.state === 'play' || game.state === 'paused' || game.state === 'levelEnd' || game.state === 'vsEnd' || (game.state === 'over' && game.overTime < 0.15)) vsEach(function (p, i) { drawHero(t); if (p) drawVsTags(p, i); });
     drawLoveFx(t);
     drawWebBalls();
     drawBolts(t);
@@ -3496,7 +3561,8 @@
     if (game.state === 'play' || game.state === 'paused') drawSplats();
     beginUI();
     if (game.state === 'play' || game.state === 'over') drawTrickStack();
-    if (game.state === 'play') { drawHUD(t); drawCoach(t); drawBanner(); drawToast(); if (game.tutorial) drawTutorial(t); }
+    if (game.state === 'play' && game.versus) { drawVsHUD(t); drawBanner(); }
+    else if (game.state === 'play') { drawHUD(t); drawCoach(t); drawIntro(); drawBanner(); drawToast(); if (game.tutorial) drawTutorial(t); }
     else if (game.state === 'title') drawTitle(t);
     else if (game.state === 'map') { drawMap(t); drawToast(); }
     else if (game.state === 'story') drawStory(t);
@@ -3504,6 +3570,8 @@
     else if (game.state === 'settings') drawSettings(t);
     else if (game.state === 'credits') drawCredits(t);
     else if (game.state === 'fun') drawFun(t);
+    else if (game.state === 'vsSetup') drawVsSetup(t);
+    else if (game.state === 'vsEnd') drawVsEnd(t);
     else if (game.state === 'maker') { ctx.fillStyle = 'rgba(15,18,50,0.6)'; ctx.fillRect(0, 0, screenW, screenH); }
     else if (game.state === 'shop') drawShop(t);
     else if (game.state === 'medals') drawMedals();
@@ -3930,7 +3998,7 @@
   }
   function startCrab() {
     var skin = bossSkin(), agent = skin !== 'crab', cfg = SPECIAL_BOSSES[skin] || (skin === 'heart' ? HEARTB : agent ? OVALS : CRAB);
-    var hp = DEBUG_BOSSHP || (cfg.hp + (game.level ? 0 : (game.stats.crabs || 0) * 6));
+    var hp = DEBUG_BOSSHP || Math.max(4, Math.round((cfg.hp + (game.level ? 0 : (game.stats.crabs || 0) * 6)) * (game.level && game.level.bossHp ? game.level.bossHp : 1)));   // round 12 tuning: per-level boss HP
     world.crab = { x: cam.x + viewW + 220, y: GROUND_Y - 320, hp: hp, maxHp: hp, phase: 1, t: 0, state: 'intro', stateT: 0, next: 1.8,
                    attack: null, flash: 0, claw: 0, rot: 0, mastX: cam.x + viewW + 270, agent: agent, hh: skin === 'heart', special: SPECIAL_BOSSES[skin] ? skin : null };
     world.hazards = []; world.boss = null;
@@ -4082,7 +4150,7 @@
     world.nextCrabX = game.level ? Infinity : hero.x + TUNING.crabEvery;
     if (game.level && game.level.bosses) {   // boss rush / double trouble: next boss please
       game.bossesBeaten = (game.bossesBeaten || 0) + 1;
-      if (game.bossesBeaten < game.level.bosses.length) { game.crabBeaten = false; world.nextCrabX = hero.x + 1500; banner('NEXT BOSS: ' + (game.bossesBeaten + 1) + ' / ' + game.level.bosses.length, '#ffd23f'); }
+      if (game.bossesBeaten < game.level.bosses.length) { game.crabBeaten = false; world.nextCrabX = hero.x + (game.level.bossGap || 1500); banner('NEXT BOSS: ' + (game.bossesBeaten + 1) + ' / ' + game.level.bosses.length, '#ffd23f'); }
     }
     world.nextHazardX = hero.x + 1200;
     music.track = 'main';
@@ -4205,11 +4273,16 @@
       if (Math.random() < 0.6) world.citizens.push({ kind: kind, x: b.x + b.w + 16, y: b.top + 44, state: 'ledge', ledge: true, t: Math.random() * 5, vy: 0 });
       else world.citizens.push({ kind: kind, x: b.x + b.w * 0.5 + 300, y: GROUND_Y - 700, state: 'wait', t: 0, vy: 0, umbrella: true });
       world.lastCitizenX = b.x;
-      world.nextCitizenX = b.x + (game.level ? rand(1300, 1900) : rand(TUNING.rescueEvery * 0.8, TUNING.rescueEvery * 1.2));
+      world.nextCitizenX = b.x + (game.level ? rand(1000, 1500) : rand(TUNING.rescueEvery * 0.8, TUNING.rescueEvery * 1.2));   // round 12: rescue levels spawn people a bit more often
       world.safeCount = Math.min(world.safeCount, 1);
     }
   }
+  function stepBalloons(dt) {
+    var tt = game.time;
+    world.anchors.forEach(function (a) { if (a.balloon) { a.x = a.bx + Math.sin(tt * a.sp + a.bob) * a.amp; a.y = a.by + Math.cos(tt * a.sp * 1.3 + a.bob) * 30; } });
+  }
   function stepCitizens(dt) {
+    stepBalloons(dt);
     var R = TUNING.heroRadius;
     for (var i = 0; i < world.citizens.length; i++) {
       var c = world.citizens[i];
@@ -4222,6 +4295,31 @@
         if (b && c.x > b.x && c.y + 18 >= b.top && c.y < b.top + 20) { c.state = 'ledge'; c.y = b.top - 18; c.umbrella = false; }
         if (c.y > GROUND_Y - 30) { c.state = 'gone'; popup(c.x, c.y - 30, 'Phew! Firefighters caught them!', '#ffffff'); }
       }
+      if (c.state === 'pulled' && c.pull) {   // web-pull: yanked along an arc into the hero's arms
+        var P = c.pull, o = P.owner; P.t = Math.min(1, P.t + dt / P.dur);
+        var e = 1 - Math.pow(1 - P.t, 2), tx = o.x - 6, ty = o.y + 34;
+        c.x = P.x0 + (tx - P.x0) * e; c.y = P.y0 + (ty - P.y0) * e - Math.sin(P.t * Math.PI) * Math.min(160, P.dist * 0.3);
+        if (P.t >= 1) {
+          var keepH = hero; hero = o;
+          if (!hero.carry) {
+            hero.carry = c; c.state = 'carried'; c.pull = null;
+            popup(c.x, c.y - 40, 'GOT YOU!', '#7df9ff'); sfx('grab'); sfx('perfect'); buzz([20, 20, 40]);
+            c.bubble = 'Wheee!'; c.bubbleT = 1.2;
+            medal('webres');
+            if (P.dist > 380) { hero.stars += 2; trick(Math.round(P.dist / 10), 'LONG-RANGE RESCUE!', '#7df9ff'); medal('longres'); }
+            else trick(15, 'WEB RESCUE!', '#7df9ff');
+          } else { c.state = 'fall'; c.vy = 0; c.pull = null; }
+          hero = keepH;
+        }
+      }
+      if (c.state === 'saved' && c.home) { c.y = c.home.top - 18 - Math.abs(Math.sin(c.t * 7)) * 10; }
+    }
+    citizenGrab();
+  }
+  function citizenGrab() {   // swing-past grabbing + carrying + dropping, for the current hero
+    var R = TUNING.heroRadius;
+    for (var i = 0; i < world.citizens.length; i++) {
+      var c = world.citizens[i];
       if ((c.state === 'ledge' || c.state === 'fall') && game.state === 'play' && Math.hypot(c.x - hero.x, c.y - hero.y) < 48 + R) {
         if (!hero.carry) {
           hero.carry = c; c.state = 'carried'; c.umbrella = false;
@@ -4229,7 +4327,6 @@
           c.bubble = 'Wheee!'; c.bubbleT = 1.2;
         } else if (!c.hinted) { c.hinted = true; popup(c.x, c.y - 40, 'Hands full! Find a SAFE roof!', '#ffd23f'); }
       }
-      if (c.state === 'saved' && c.home) { c.y = c.home.top - 18 - Math.abs(Math.sin(c.t * 7)) * 10; }
     }
     if (hero.carry) {
       var cc = hero.carry, sw = Math.sin(game.time * 6) * 6;
@@ -4239,6 +4336,31 @@
         if (rb && rb.safe && hero.x >= rb.x - 10 && hero.x <= rb.x + rb.w + 10) rescueDrop(rb);
       }
     }
+  }
+  function ropeStyle(ch) { return ch.hearts ? 'heart' : ch.web === 'rock' || ch.shot === 'rock' ? 'rock' : ch.shot === 'ice' || ch.freeze ? 'ice' : 'web'; }
+  function pullTarget(maxD) {   // a person in need, within web range
+    var best = null, bd = maxD;
+    world.citizens.forEach(function (c) { if (c.state !== 'ledge' && c.state !== 'fall') return; var d = Math.hypot(c.x - hero.x, c.y - hero.y); if (d < bd && c.x > hero.x - 250) { bd = d; best = c; } });
+    return best ? { c: best, d: bd } : null;
+  }
+  function webPull(c) {   // FIRE a web at someone in need: they get yanked over to you
+    if (hero.carry || !c || (c.state !== 'ledge' && c.state !== 'fall')) return false;
+    var d = Math.hypot(c.x - hero.x, c.y - hero.y);
+    c.state = 'pulled'; c.umbrella = false; c.pull = { owner: hero, t: 0, dur: clamp(d / 1400, 0.35, 0.7), x0: c.x, y0: c.y, dist: d, style: ropeStyle(currentCharacter()) };
+    c.bubble = 'Whoa!'; c.bubbleT = 0.8; hero.fireCool = TUNING.fireCooldown;
+    sfx('thwip'); sfx('shoot'); buzz(15);
+    return true;
+  }
+  function drawPullRope(c) {
+    var P = c.pull, o = P.owner, x1 = SX(o.x), y1 = SY(o.y - 10), x2 = SX(c.x), y2 = SY(c.y - 8);
+    var mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - 30 * scale * (1 - P.t);
+    var col = P.style === 'heart' ? '#ff4f9a' : P.style === 'rock' ? '#8a6a4a' : P.style === 'ice' ? '#7df9ff' : '#ffffff';
+    ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, 3.2 * scale); if (P.style === 'rock') ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(mx, my, x2, y2); ctx.stroke(); ctx.setLineDash([]);
+    if (P.style === 'heart') { ctx.fillStyle = '#ff4f9a'; ctx.beginPath(); ctx.arc(x2 - 5, y2 - 4, 7 * scale, 0, 6.283); ctx.arc(x2 + 5, y2 - 4, 7 * scale, 0, 6.283); ctx.fill(); }
+    else if (P.style === 'rock') { ctx.fillStyle = '#7a6250'; for (var k = 1; k < 6; k++) { var f = k / 6; ctx.beginPath(); ctx.arc(x1 + (x2 - x1) * f, y1 + (y2 - y1) * f - Math.sin(f * Math.PI) * (y1 + y2 - 2 * my) * 0.5, 4 * scale, 0, 6.283); ctx.fill(); } }
+    else if (P.style === 'ice') { ctx.strokeStyle = 'rgba(200,245,255,0.6)'; ctx.lineWidth = Math.max(5, 8 * scale); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(mx, my, x2, y2); ctx.stroke(); }
+    else { ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x2, y2, 12 * scale, 0, 6.283); ctx.stroke(); }
   }
   function rescueDrop(b) {
     var c = hero.carry;
@@ -4311,6 +4433,7 @@
         ctx.fillStyle = ['#ff3b3b', '#4f8bff', '#ffd23f'][Math.floor(hash(c.x) * 3)];
         ctx.beginPath(); ctx.arc(x + 10 * s, y - 44 * s, 26 * s, Math.PI, 0); ctx.fill();
       }
+      if (c.state === 'pulled' && c.pull) drawPullRope(c);
       var help = c.state === 'ledge' || c.state === 'fall';
       drawCitizen(c.kind, x, y, s, t + c.t, help || c.state === 'saved');
       if (help && Math.sin(t * 6 + c.t) > -0.3) text('HELP!', x, y - 46 * s, Math.max(12, 16 * scale), '#ffffff');
@@ -4596,6 +4719,14 @@
   /* =====================================================================
    * STORY MODE  - map, comic cards, goals, level results
    * =================================================================== */
+  function drawIntro() {   // short 'level intro' card with the goal
+    if (!(game.intro > 0) || !game.level) return;
+    var a = Math.min(1, game.intro * 2), w = Math.min(screenW - 40, 460), h = 70, x = (screenW - w) / 2, y = safe.top + Math.max(118, screenH * 0.2);
+    ctx.globalAlpha = a; roundRect(x, y, w, h, 16); ctx.fillStyle = 'rgba(15,18,50,0.85)'; ctx.fill(); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.stroke();
+    var t1 = 'LEVEL ' + (game.levelIndex + 1) + ': ' + game.level.name, t2 = 'GOAL: ' + goalText(game.level);
+    text(t1, screenW / 2, y + 22, fitSize(t1, 20, w - 20), '#ffd23f'); text(t2, screenW / 2, y + 50, fitSize(t2, 16, w - 20), '#ffffff', 'center', '800');
+    ctx.globalAlpha = 1;
+  }
   function goalText(L) {
     switch (L.goal) {
       case 'reach': return 'Swing to the FINISH flag (' + L.target + ' m)';
@@ -4643,6 +4774,7 @@
   function dailyModName(id) { for (var i = 0; i < DAILY_MODS.length; i++) if (DAILY_MODS[i].id === id) return DAILY_MODS[i].name; return id; }
   function dailyInfo() { var d = save.daily || {}; var today = dayKey(); return { best: d.bestDate === today ? d.todayBest || 0 : 0, streak: d.last === today || d.last === dayKey(-1) ? d.streak || 0 : 0, allBest: d.allBest || 0, played: d.last === today }; }
   function startDaily() {
+    endVersus();
     var today = dayKey(), d = save.daily || {};
     if (d.last !== today) { d.streak = d.last === dayKey(-1) ? (d.streak || 0) + 1 : 1; d.last = today; }
     save.daily = d; writeSave();
@@ -4668,7 +4800,7 @@
     R.enemies = (L.enemies || []).concat(['saw', 'bird']);
     if (L.zone <= 1) R.zone = 2;   // day / sunset levels turn into night
     if (L.goal === 'stars' || L.goal === 'web' || L.goal === 'reach') R.target = Math.ceil(L.target * 1.25);
-    if (L.kingHp || L.goal === 'king') R.kingHp = (L.kingHp || 1) * 1.3;
+    if (L.kingHp || L.goal === 'king') R.kingHp = Math.min(1.8, (L.kingHp || 1) * 1.3);
     if (L.bigbot) R.bigbot = Math.max(2500, L.bigbot * 0.7);
     return R;
   }
@@ -4725,7 +4857,11 @@
     mirrorNow();   // level/star/unlock change: back up + mirror right away
     game.result = { remix: rmx, i: i, rating: rating, bonusOk: game.bonusOk, noHit: game.heartsLost === 0, stars: hero.stars,
                     newPower: first && L.power ? L.power : null, unlocked: first && i + 1 < LEVELS.length ? i + 1 : -1 };
-    if (rating === 3) medal('stars3');
+    if (rating === 3) {   // PERFECT LEVEL fanfare
+      medal('stars3'); game.fanfare = 3;
+      for (var ff = 0; ff < 8; ff++) burst(hero.x + rand(-300, 300), hero.y - rand(0, 300), ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff', '#ff8ab3'][ff % 5], 18, 'confetti');
+      [0, 0.15, 0.3, 0.6].forEach(function (d) { setTimeout(function () { sfx('perfect'); }, d * 1000); });
+    } else game.fanfare = 0;
     if (L.goal === 'king') medal('story');
     game.state = 'levelEnd'; game.overTime = 0; game.starsShown = 0;
     music.track = 'main'; world.bolts = []; hero.rope = null; hero.zip = null; input.held = false;
@@ -4736,12 +4872,13 @@
     if (!L) return;
     endDaily();
     if (remix) skipStory = true;
+    endVersus();
     var go = function () { game.mode = 'story'; game.levelIndex = i; game.remix = !!remix; game.level = remix ? remixLevel(L) : L; startGame(); if (remix) banner('REMIX!', '#ff4f9a'); };
     if (L.story && !skipStory && !save.seen[L.story]) showStory(L.story, go); else go();
   }
-  function startEndless() { endDaily(); game.remix = false; game.mode = 'endless'; game.level = null; game.levelIndex = -1; startGame(); }
+  function startEndless() { endDaily(); endVersus(); game.remix = false; game.mode = 'endless'; game.level = null; game.levelIndex = -1; startGame(); }
   function toTitleScenery() {
-    endDaily();
+    endDaily(); endVersus();
     game.level = null;
     resetWorld(); resetHero(); extendWorld(viewW + 1600); updateCamera(0, true);
     particles = []; popups = []; talk.life = 0;
@@ -5038,7 +5175,11 @@
     ctx.fillStyle = 'rgba(15,18,50,0.8)'; ctx.fillRect(0, 0, screenW, screenH);
     var top = safe.top + 10, avail = O.next.y - top - 10;
     var big = Math.min(screenW / 11, avail / 9, 48);
-    var ttl = r.remix ? 'REMIX COMPLETE!' : 'LEVEL COMPLETE!';
+    if (r.rating === 3) {   // fanfare: falling confetti + PERFECT!
+      for (var cf = 0; cf < 40; cf++) { var fy = ((game.overTime * (80 + hash(cf) * 120) + hash(cf + 9) * screenH) % (screenH + 20)) - 10;
+        ctx.fillStyle = ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff', '#ff8ab3'][cf % 5]; ctx.save(); ctx.translate(hash(cf + 3) * screenW + Math.sin(game.overTime * 2 + cf) * 20, fy); ctx.rotate(game.overTime * 3 + cf); ctx.fillRect(-5, -3, 10, 6); ctx.restore(); }
+    }
+    var ttl = r.remix ? 'REMIX COMPLETE!' : r.rating === 3 ? 'PERFECT LEVEL!' : 'LEVEL COMPLETE!';
     text(ttl, screenW / 2, top + big * 0.7, fitSize(ttl, big, screenW - 30), r.remix ? '#ff4f9a' : '#3ddc84');
     text(L.name + (r.remix ? ' REMIX' : ''), screenW / 2, top + big * 1.65, fitSize(L.name + ' REMIX', big * 0.55, screenW - 30), '#ffd23f');
     if (r.remix && r.rating === 3 && game.starsShown >= 3) drawCrown(screenW / 2, top + big * 2.25, big * 0.4);
@@ -5193,6 +5334,317 @@
   }
   function closeSaveCode() { if (saveUI.el) saveUI.el.style.display = 'none'; saveUI.open = false; }
 
+  /* ---------- 2-PLAYER VERSUS (one device): RACE, STAR BATTLE, WEB WARS ---------- */
+  var VS_MODES = [ { id: 'race', name: 'RACE', info: 'First to 800 m (or furthest in 90 s)' },
+                   { id: 'stars', name: 'STAR BATTLE', info: 'Most stars in 90 s. Rescue people for +3!' },
+                   { id: 'wars', name: 'WEB WARS', info: 'Web your rival to stun them. Stars + 5 per hit' },
+                   { id: 'tag', name: 'TAG', info: 'Whoever is IT must web the other. Least time IT wins!' } ];
+  var VS_HOWTO = {
+    race:  ['Swing as far as you can!', 'First to 800 m wins (or furthest after 90 s).', 'Grab a PORTAL to swap places, SLOW to goo your rival.'],
+    stars: ['Grab the most stars in 90 s.', 'FIRE at people in need: rescues give +3.', 'Steal a rescue by webbing them first!'],
+    wars:  ['FIRE webs at your rival to stun them.', '+5 per hit, stars count too.', 'After a hit you are safe for 2 s.'],
+    tag:   ['The one who is IT has a red glow.', 'IT: FIRE a web at the other player to pass it on.', 'Least time IT after 60 s wins!']
+  };
+  var VS_COLORS = ['#ff3b3b', '#4f8bff'], VS_TIME = 90, VS_RACE = 800;
+  var VS_TAUNTS = ['Catch me if you can!', 'See ya!', 'Too slow!', 'Ha ha, I\'m winning!', 'Try to keep up!', 'Bye bye!'];
+  var vsSel = { mode: 0, p: [null, null], wins: [0, 0] };
+  function vsChar(i) { var id = vsSel.p[i] || (i === 0 ? game.character : CHARACTERS[(characterIndex() + 1) % CHARACTERS.length].id); return charById(id) ? id : CHARACTERS[i].id; }
+  function openVersus() { endDaily(); vsSel.p[0] = vsChar(0); vsSel.p[1] = vsChar(1); game.state = 'vsSetup'; sfx('select'); }
+  function vsLayout() {
+    var top = safe.top + 10, W = screenW - safe.left - safe.right, landscape = screenW > screenH;
+    var mh = Math.max(40, Math.min(54, screenH * 0.07)), mw = Math.min(200, (W - 50) / 4), mx = (screenW - (mw * 4 + 30)) / 2, my = top + 54;
+    var modes = VS_MODES.map(function (m, i) { return { x: mx + i * (mw + 10), y: my, w: mw, h: mh }; });
+    var py = my + mh + 40, ph = Math.max(150, Math.min(300, screenH - py - 150)), pw = Math.min(300, (W - 50) / 2);
+    var panels = [0, 1].map(function (i) { var x = screenW / 2 + (i ? 10 : -10 - pw); return { x: x, y: py, w: pw, h: ph, prev: { x: x + 4, y: py + ph / 2 - 26, w: 44, h: 52 }, next: { x: x + pw - 48, y: py + ph / 2 - 26, w: 44, h: 52 } }; });
+    var by = py + ph + 14, bh = Math.max(46, Math.min(60, screenH * 0.08));
+    return { top: top, modes: modes, panels: panels, start: { x: screenW / 2 - 130, y: by, w: 260, h: bh }, back: { x: safe.left + 10, y: top, w: 100, h: 42 }, hint: by + bh + 22 };
+  }
+  function drawVsSetup(t) {
+    ctx.fillStyle = 'rgba(15,18,50,0.88)'; ctx.fillRect(0, 0, screenW, screenH);
+    var V = vsLayout();
+    text('2 PLAYER', screenW / 2, V.top + 22, Math.min(36, screenW / 11), '#ffd23f');
+    button(V.back, 'BACK', '#4f8bff');
+    V.modes.forEach(function (r, i) { button(r, VS_MODES[i].name, vsSel.mode === i ? '#ff9f1c' : '#8a92a6'); });
+    var info = VS_MODES[vsSel.mode].info; text(info, screenW / 2, V.modes[0].y + V.modes[0].h + 18, fitSize(info, 15, screenW - 30), '#ffffff', 'center', '700');
+    V.panels.forEach(function (P, i) {
+      roundRect(P.x, P.y, P.w, P.h, 18); ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = VS_COLORS[i]; ctx.stroke();
+      text('PLAYER ' + (i + 1), P.x + P.w / 2, P.y + 18, 18, VS_COLORS[i]);
+      var ch = charById(vsChar(i)), sz = Math.min(P.h - 80, P.w - 110);
+      if (ch.hearts) drawLoveHearts(P.x + P.w / 2, P.y + P.h / 2 + 4, sz, t, 5, 'back');
+      drawCharacter(ch, P.x + P.w / 2, P.y + P.h / 2 + 4, sz, 0, t, 0, 0, null);
+      text(ch.name, P.x + P.w / 2, P.y + P.h - 32, fitSize(ch.name, 17, P.w - 20), '#ffffff', 'center', '800');
+      text(ch.villain ? 'VILLAIN' : ch.custom ? 'MY HERO' : 'HERO', P.x + P.w / 2, P.y + P.h - 12, 12, ch.villain ? '#ff4f9a' : '#7df9ff', 'center', '800');
+      button(P.prev, '<', '#4f8bff'); button(P.next, '>', '#4f8bff');
+    });
+    button(V.start, 'START!', '#3ddc84');
+    if (vsSel.wins[0] + vsSel.wins[1]) text('Best of 3:  P1 ' + vsSel.wins[0] + '  -  ' + vsSel.wins[1] + ' P2', screenW / 2, V.start.y - 6, 13, '#ffd23f', 'center', '800');
+    var hint = 'Phone/tablet: P1 taps the ' + (screenW > screenH ? 'LEFT' : 'BOTTOM') + ' half, P2 the ' + (screenW > screenH ? 'RIGHT' : 'TOP') + ' half.  Keys: P1 Space + F,  P2 Enter / Up + L';
+    text(hint, screenW / 2, Math.min(screenH - safe.bottom - 12, V.hint), fitSize(hint, 14, screenW - 20), '#c9cfe0', 'center', '700');
+  }
+  function vsSetupPress(px, py) {
+    var V = vsLayout();
+    if (inRect(px, py, V.back)) { game.state = 'title'; sfx('select'); return; }
+    V.modes.forEach(function (r, i) { if (inRect(px, py, r)) { vsSel.mode = i; sfx('select'); } });
+    V.panels.forEach(function (P, i) {
+      var d = inRect(px, py, P.prev) ? -1 : inRect(px, py, P.next) ? 1 : 0;
+      if (d) { var k = CHARACTERS.findIndex(function (c) { return c.id === vsChar(i); }); vsSel.p[i] = CHARACTERS[(k + d + CHARACTERS.length) % CHARACTERS.length].id; sfx('select'); }
+    });
+    if (inRect(px, py, V.start)) startVersus();
+  }
+  function cloneHero(h) { var o = {}; for (var k in h) o[k] = Array.isArray(h[k]) ? h[k].slice() : h[k]; o.trail = []; return o; }
+  function startVersus() {
+    endDaily();
+    if (game.versus && game.versus.p) hero = game.versus.p[0].h;   // always rebuild from the original hero object
+    var prevChar = game.versus ? game.versus.prevChar : game.character;
+    if (vsSel.wins[0] >= 2 || vsSel.wins[1] >= 2) vsSel.wins = [0, 0];   // new series after a champion
+    game.versus = null; game.mode = 'endless'; game.level = null; game.levelIndex = -1; game.remix = false;
+    game.character = vsSel.p[0];
+    startGame();
+    game.power = null; game.tutorial = null; game.coach = null; game.ghost = null; game.ghostRec = null;
+    var h1 = hero, h2 = cloneHero(hero);   // same start line: no spawn advantage
+    var vm = VS_MODES[vsSel.mode].id;
+    game.versus = { mode: vm, t: vm === 'tag' ? 60 : VS_TIME, count: 4.4, it: Math.random() < 0.5 ? 0 : 1, itT: [0, 0], immune: 0, pickX: 1400, pk: [], prevChar: prevChar, lead: -1, tauntT: 0,
+                    p: [{ h: h1, ch: vsSel.p[0], held: false, stun: 0, safe: 0, hits: 0, pen: 0, falls: 0 }, { h: h2, ch: vsSel.p[1], held: false, stun: 0, safe: 0, hits: 0, pen: 0, falls: 0 }] };
+    world.hazards = []; vsNoBosses(); game.banner = null;
+    music.track = 'boss';
+  }
+  function vsNoBosses() { world.nextCrabX = world.nextFinalBossX = world.nextBossX = world.nextHazardX = Infinity; if (game.versus && game.versus.mode !== 'stars') world.nextCitizenX = Infinity; }
+  function endVersus() { if (!game.versus) return; var V = game.versus; hero = V.p[0].h; game.character = V.prevChar || game.character; game.versus = null; TUNING.gravity = BASE_GRAVITY; }
+  function vsScore(i) { var V = game.versus, p = V.p[i]; if (V.mode === 'tag') return Math.round(V.itT[i] * 10) / 10; return V.mode === 'race' ? Math.max(0, Math.floor(p.h.maxX / 10) - p.pen) : V.mode === 'stars' ? p.h.stars : p.h.stars + p.hits * 5; }
+  function vsSwap(p) { hero = p.h; game.character = p.ch; }
+  function vsEach(fn) {   // draw/run something once per player
+    if (!game.versus) { fn(); return; }
+    var V = game.versus, keep = hero, kc = game.character;
+    V.p.forEach(function (p, i) { vsSwap(p); fn(p, i); });
+    hero = keep; game.character = kc;
+  }
+  function vsFall() {   // fell / hit: pop back in near the rival, small penalty
+    var V = game.versus, me = V.p[V.cur], other = V.p[1 - V.cur].h;
+    me.falls++; if (V.mode === 'race') me.pen += 15; else hero.stars = Math.max(0, hero.stars - 2);
+    vsPlace(other, V.mode === 'race' ? 'OOPS! -15 m' : 'OOPS! -2');
+  }
+  function vsPlace(other, msg) {
+    hero.x = Math.max(other.x - 260, 40); hero.y = Math.min(other.y - 160, GROUND_Y - 500); hero.vx = Math.max(300, other.vx * 0.8); hero.vy = -200;
+    hero.rope = null; hero.zip = null; hero.climbing = null; hero.onRoof = false; hero.airborne = true; hero.hurt = 1.2; hero.hearts = 9; hero.carry = null;
+    if (!isFinite(hero.x) || !isFinite(hero.y)) { hero.x = other.x; hero.y = other.y - 100; }
+    popup(hero.x, hero.y - 40, msg, '#ffd23f'); sfx('nope');
+  }
+  function vsFire(i) {
+    var V = game.versus; if (!V || game.state !== 'play' || V.count > 0) return;
+    var p = V.p[i]; if (p.stun > 0) return;
+    var keep = hero, kc = game.character; vsSwap(p);
+    if (hero.fireCool <= 0 && hero.ammo >= 1) {
+      var pt = V.mode === 'stars' && !hero.carry && pullTarget(760);
+      if (pt) webPull(pt.c);
+      else {
+        hero.ammo -= 1; hero.fireCool = TUNING.fireCooldown;
+        var o = V.p[1 - i].h, hd = heroHand(), dx = 1, dy = -0.1;
+        if ((V.mode === 'wars' || (V.mode === 'tag' && V.it === i)) && Math.hypot(o.x - hd.x, o.y - hd.y) < 900) { var ld = Math.hypot(o.x - hd.x, o.y - hd.y) / TUNING.webBallSpeed; dx = o.x + o.vx * ld - hd.x; dy = o.y + o.vy * ld - hd.y; }
+        var L = Math.hypot(dx, dy) || 1, me = currentCharacter();
+        world.webBalls.push({ x: hd.x, y: hd.y, vx: dx / L * TUNING.webBallSpeed + hero.vx * 0.25, vy: dy / L * TUNING.webBallSpeed, life: 0.9, spin: 0, heart: !!me.hearts, kase: me.shot === 'case', ice: me.shot === 'ice', vs: i + 1 });
+        sfx('shoot');
+      }
+    }
+    hero = keep; game.character = kc;
+  }
+  function vsUpdate(dt, realDt) {
+    var V = game.versus;
+    vsNoBosses();
+    if (V.count > 0) {
+      var c0 = Math.ceil(V.count); V.count -= realDt;
+      if (Math.ceil(V.count) !== c0) sfx(V.count > 0 ? 'select' : 'victory');
+      V.p.forEach(function (p) { p.h.vx = 0; p.h.vy = 0; });
+      return;
+    }
+    V.t -= dt;
+    var steps = 4, h = dt / steps;
+    V.flip = !V.flip;   // fairness: who gets checked first (stars, rescues) alternates every frame
+    (V.flip ? [0, 1] : [1, 0]).forEach(function (i) {
+      var p = V.p[i];
+      V.cur = i; vsSwap(p);
+      hero.hearts = 9;
+      if (p.stun > 0) { p.stun -= dt; if (hero.rope) releaseWeb(); }
+      if (p.safe > 0) p.safe -= dt;
+      if (p.slow > 0) { p.slow -= dt; hero.vx = Math.min(hero.vx, 380); hero.vy = Math.max(hero.vy, -700); }
+      if (hero.fireCool > 0) hero.fireCool -= dt;
+      if (hero.ammo < TUNING.ammo) hero.ammo = Math.min(TUNING.ammo, hero.ammo + dt / TUNING.ammoRecharge);
+      if (hero.multTime > 0) hero.multTime -= dt; else if (hero.mult > 1) hero.mult = Math.max(1, hero.mult - dt * 1.5);
+      input.held = p.held && p.stun <= 0;
+      if (input.held && !hero.rope) shootWeb(); else if (!input.held && hero.rope) releaseWeb();
+      var o = V.p[1 - i].h, gap = o.x - hero.x;
+      if (gap > 450 && hero.vx > 0) { hero.vx += Math.min(260, gap * 0.25) * dt; p.boost = true; } else p.boost = false;   // catch-up boost
+      for (var s = 0; s < steps && game.state === 'play'; s++) {
+        stepHero(h);
+        if (hero.y + TUNING.heroRadius >= GROUND_Y) { vsFall(); break; }
+      }
+      if (gap > Math.max(1400, viewW * 0.95)) { p.pen += V.mode === 'race' ? 5 : 0; vsPlace(o, 'PULLED FORWARD!'); }
+      collect(); citizenGrab();
+      if (!hero.onRoof) hero.trail.push({ x: hero.x, y: hero.y }); else if (hero.trail.length) hero.trail.shift();
+      if (hero.trail.length > 18) hero.trail.shift();
+    });
+    // web-wars hits
+    for (var k = world.webBalls.length - 1; k >= 0; k--) {
+      var wb = world.webBalls[k]; if (!wb.vs || (V.mode !== 'wars' && V.mode !== 'tag')) continue;
+      var tg = V.p[2 - wb.vs];
+      if (V.mode === 'tag') {   // TAG: only IT's webs count, and they pass IT on
+        if (V.it !== wb.vs - 1 || V.immune > 0 || Math.hypot(wb.x - tg.h.x, wb.y - tg.h.y) > 60) continue;
+        world.webBalls.splice(k, 1); V.it = 1 - V.it; V.immune = 1.6; tg.stun = 0.6; tg.h.rope = null;
+        popup(tg.h.x, tg.h.y - 60, 'TAG! YOU\'RE IT!', '#ff3b3b'); burst(tg.h.x, tg.h.y, '#ff3b3b', 16); sfx('webbed'); buzz(40);
+        continue;
+      }
+      if (tg.safe <= 0 && Math.hypot(wb.x - tg.h.x, wb.y - tg.h.y) < 55) {
+        world.webBalls.splice(k, 1);
+        tg.stun = 1.1; tg.safe = 2.4; tg.h.vx *= 0.5; tg.h.rope = null; V.p[wb.vs - 1].hits++;
+        popup(tg.h.x, tg.h.y - 60, 'STUNNED!', '#7df9ff'); burst(tg.h.x, tg.h.y, '#ffffff', 14); sfx('webbed'); buzz(30);
+      }
+    }
+    if (V.mode === 'tag') { V.itT[V.it] += dt; if (V.immune > 0) V.immune -= dt;
+      var A0 = V.p[0].h, B0 = V.p[1].h;   // touching also tags
+      if (V.immune <= 0 && Math.hypot(A0.x - B0.x, A0.y - B0.y) < 50) { var tgd = V.p[1 - V.it]; V.it = 1 - V.it; V.immune = 1.6; popup(tgd.h.x, tgd.h.y - 60, 'TAG!', '#ff3b3b'); sfx('webbed'); } }
+    vsPickups(dt);
+    var lead = vsScore(0) === vsScore(1) ? V.lead : (vsScore(0) > vsScore(1)) !== (V.mode === 'tag') ? 0 : 1;
+    V.tauntT -= dt;
+    if (lead !== V.lead && lead >= 0) {
+      V.lead = lead;
+      if (V.tauntT <= 0) { V.tauntT = 5; var lc = charById(V.p[lead].ch), tl = VS_TAUNTS[Math.floor(Math.random() * VS_TAUNTS.length)];
+        V.say = { i: lead, text: tl, life: 2 }; speak(tl, lc.voice); }
+    }
+    if (V.say) { V.say.life -= dt; if (V.say.life <= 0) V.say = null; }
+    // the world follows whoever is in front
+    var front = V.p[0].h.x >= V.p[1].h.x ? 0 : 1; vsSwap(V.p[front]); V.cur = front;
+    if (V.t <= 0 || (V.mode === 'race' && (vsScore(0) >= VS_RACE || vsScore(1) >= VS_RACE))) vsFinish();
+  }
+  function vsFinish() {
+    var V = game.versus, a = vsScore(0), b = vsScore(1), w = a === b ? -1 : (a > b) !== (V.mode === 'tag') ? 0 : 1;
+    if (w >= 0) { vsSel.wins[w]++; medal('vswin'); if (vsSel.wins[w] >= 2) medal('vschamp'); if (V.mode === 'tag') medal('vstag'); }
+    V.result = { a: a, b: b, w: w, champ: w >= 0 && vsSel.wins[w] >= 2 };
+    game.state = 'vsEnd'; game.overTime = 0;
+    V.p.forEach(function (p) { p.held = false; p.h.rope = null; });
+    for (var i = 0; i < 6; i++) burst((w >= 0 ? V.p[w].h.x : hero.x) + rand(-200, 200), hero.y - rand(50, 250), ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff'][i % 4], 18, 'confetti');
+    sfx('victory'); buzz([40, 30, 80]);
+    if (w >= 0) { var wc = charById(V.p[w].ch); speak((wc.lines && wc.lines[0]) || 'I win!', wc.voice); }
+  }
+  function vsEndLayout() {
+    var bh = 56, bw = Math.min(200, (screenW - 40) / 2), y = screenH - safe.bottom - bh - 20;
+    return { rematch: { x: screenW / 2 - bw - 8, y: y, w: bw, h: bh }, menu: { x: screenW / 2 + 8, y: y, w: bw, h: bh } };
+  }
+  function drawVsEnd(t) {
+    var V = game.versus, R = V.result, O = vsEndLayout();
+    ctx.fillStyle = 'rgba(15,18,50,0.72)'; ctx.fillRect(0, 0, screenW, screenH);
+    if (game.overTime % 0.5 < 0.02) burst(cam.x + viewW * Math.random(), cam.y + 50, ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff'][Math.floor(Math.random() * 4)], 10, 'confetti');
+    var big = Math.min(56, screenW / 10), top = safe.top + 20;
+    var title = R.w < 0 ? 'IT\'S A TIE!' : R.champ ? 'PLAYER ' + (R.w + 1) + ' IS CHAMPION!' : 'PLAYER ' + (R.w + 1) + ' WINS!';
+    text(title, screenW / 2, top + big * 0.7, fitSize(title, big, screenW - 30), R.w < 0 ? '#ffd23f' : VS_COLORS[R.w]);
+    var sz = Math.min(screenH * 0.3, screenW * 0.25), cy = top + big * 1.6 + sz * 0.6;
+    [0, 1].forEach(function (i) {
+      var x = screenW / 2 + (i ? 1 : -1) * Math.min(screenW * 0.22, 220), ch = charById(V.p[i].ch), win = R.w === i;
+      var yy = cy - (win ? Math.abs(Math.sin(t * 5)) * 18 : 0);
+      if (win) drawCrown(x, yy - sz * 0.62, sz * 0.14);
+      drawCharacter(ch, x, yy, sz * (win ? 1 : 0.8), win ? Math.sin(t * 4) * 0.1 : 0, t, 0, 0, null);
+      text('P' + (i + 1) + ': ' + (i ? R.b : R.a) + (V.mode === 'race' ? ' m' : V.mode === 'tag' ? ' s IT' : ''), x, cy + sz * 0.62, 24, VS_COLORS[i]);
+      text(ch.name, x, cy + sz * 0.62 + 26, 15, '#ffffff', 'center', '800');
+    });
+    text('Best of 3:  ' + vsSel.wins[0] + '  -  ' + vsSel.wins[1], screenW / 2, O.rematch.y - 22, 20, '#ffd23f');
+    if (game.overTime > 0.8) { button(O.rematch, R.champ ? 'NEW SERIES' : 'REMATCH!', '#3ddc84'); button(O.menu, 'MENU', '#4f8bff'); }
+  }
+  function vsEndPress(px, py) {
+    if (game.overTime < 0.8) return;
+    var O = vsEndLayout();
+    if (inRect(px, py, O.rematch)) { startVersus(); return; }
+    if (inRect(px, py, O.menu)) { endVersus(); toTitleScenery(); game.state = 'vsSetup'; sfx('select'); }
+  }
+  function vsFireRects() {
+    var r = clamp(Math.min(screenW, screenH) * 0.095, 32, 62), landscape = screenW > screenH;   // big on tablets
+    if (landscape) return [{ cx: safe.left + r + 16, cy: screenH - safe.bottom - r - 16, r: r }, { cx: screenW - safe.right - r - 16, cy: screenH - safe.bottom - r - 16, r: r }];
+    return [{ cx: screenW - safe.right - r - 16, cy: screenH - safe.bottom - r - 16, r: r }, { cx: safe.left + r + 16, cy: safe.top + r + 130, r: r }];
+  }
+  function vsPlayerAt(x, y) { return screenW > screenH ? (x < screenW / 2 ? 0 : 1) : (y > screenH / 2 ? 0 : 1); }
+  function vsPointer(id, x, y) {
+    var V = game.versus, F = vsFireRects();
+    for (var i = 0; i < 2; i++) if (Math.hypot(x - F[i].cx, y - F[i].cy) < F[i].r * 1.3) { input.roles[id] = 'ui'; vsFire(i); return; }
+    var pi = vsPlayerAt(x, y); input.roles[id] = 'vs' + pi; V.p[pi].held = true;
+  }
+  function vsRelease(role) {
+    var V = game.versus; if (!V) return; var pi = +role.slice(2);
+    var still = Object.keys(input.roles).some(function (k) { return input.roles[k] === role; });
+    if (!still) V.p[pi].held = false;
+  }
+  function drawVsHUD(t) {
+    var V = game.versus, s = Math.max(16, Math.min(26, Math.min(screenW, screenH) / 18)), T = safe.top + 18;
+    var tl = Math.max(0, Math.ceil(V.t)), mode = VS_MODES[vsSel.mode].name;
+    [0, 1].forEach(function (i) {
+      var x = i ? screenW - safe.right - 14 : safe.left + 14, al = i ? 'right' : 'left', sc = vsScore(i);
+      text('P' + (i + 1) + ' ' + charById(V.p[i].ch).name.split(' ')[0], x, T, s * 0.7, VS_COLORS[i], al, '900');
+      text(V.mode === 'tag' ? 'IT ' + sc.toFixed(1) + 's' : sc + (V.mode === 'race' ? ' m' : ' pts'), x, T + s * 1.1, s, V.mode === 'tag' && V.it === i ? '#ff6b6b' : '#ffffff', al);
+      if (V.p[i].boost) text('CATCH-UP BOOST!', x, T + s * 2.1, s * 0.5, '#3ddc84', al, '800');
+      if (V.lead === i) drawCrown(i ? x - 10 : x + 10, T + s * 2.9, 9);
+    });
+    button(pauseButtonRect(), 'II', 'rgba(15,18,50,0.6)');
+    var pr = pauseButtonRect();
+    text(mode + '  ' + tl + 's', screenW / 2, pr.y + pr.h + 16, s * 0.6, tl <= 10 ? '#ff6b6b' : '#ffd23f', 'center', '900');
+    if (V.mode === 'race') {   // progress bars to the finish
+      var bw = Math.min(300, screenW * 0.4), bx = (screenW - bw) / 2, by = pr.y + pr.h + 30;
+      [0, 1].forEach(function (i) { ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(bx, by + i * 9, bw, 6); ctx.fillStyle = VS_COLORS[i]; ctx.fillRect(bx, by + i * 9, bw * Math.min(1, vsScore(i) / VS_RACE), 6); });
+    }
+    vsFireRects().forEach(function (f, i) {
+      ctx.globalAlpha = 0.85; ctx.fillStyle = VS_COLORS[i]; ctx.beginPath(); ctx.arc(f.cx, f.cy, f.r, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.lineWidth = 3; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+      text('FIRE', f.cx, f.cy, f.r * 0.5, '#ffffff'); text('P' + (i + 1), f.cx, f.cy - f.r - 10, 12, VS_COLORS[i], 'center', '900');
+    });
+    // split line
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2; ctx.setLineDash([8, 8]); ctx.beginPath();
+    if (screenW > screenH) { ctx.moveTo(screenW / 2, pr.y + pr.h + 50); ctx.lineTo(screenW / 2, screenH); } else { ctx.moveTo(0, screenH / 2); ctx.lineTo(screenW, screenH / 2); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (!('ontouchstart' in window) && game.playTime < 12) text('P1: Space swing, F fire    P2: Enter / Up swing, L fire', screenW / 2, screenH - safe.bottom - 14, fitSize('P1: Space swing, F fire    P2: Enter / Up swing, L fire', 14, screenW * 0.6), '#ffffff', 'center', '800');
+    if (V.count > 1.4) {   // how-to-play card for this mode
+      var hw = Math.min(screenW - 40, 520), hh = 150, hx = (screenW - hw) / 2, hy = screenH * 0.58 - hh / 2, ht = VS_HOWTO[V.mode];
+      roundRect(hx, hy, hw, hh, 18); ctx.fillStyle = 'rgba(15,18,50,0.88)'; ctx.fill(); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.stroke();
+      text('HOW TO PLAY: ' + VS_MODES[vsSel.mode].name, screenW / 2, hy + 24, fitSize('HOW TO PLAY: ' + VS_MODES[vsSel.mode].name, 20, hw - 20), '#ffd23f');
+      ht.forEach(function (ln, q) { text(ln, screenW / 2, hy + 56 + q * 28, fitSize(ln, 16, hw - 24), '#ffffff', 'center', '800'); });
+    }
+    if (V.count > 0 && V.count <= 3.4) { var n = Math.ceil(V.count) - 1, lab = n > 0 ? '' + n : 'GO!', k = 1 + (V.count % 1) * 0.4;
+      text(lab, screenW / 2, screenH * 0.42, Math.min(160, screenW / 4) * k, n > 0 ? '#ffffff' : '#3ddc84'); }
+  }
+  function vsPickups(dt) {   // 2P power-ups: PORTAL (swap places) and SLOW (goo on your rival)
+    var V = game.versus, front = Math.max(V.p[0].h.x, V.p[1].h.x);
+    while (V.pickX < front + 2200) { V.pk.push({ type: Math.random() < 0.5 ? 'portal' : 'slow', x: V.pickX, y: GROUND_Y - rand(380, 560), t: 0 }); V.pickX += rand(1300, 1900); }
+    for (var k = V.pk.length - 1; k >= 0; k--) {
+      var q = V.pk[k], taken = false; q.t += dt;
+      for (var i = 0; i < 2 && !taken; i++) {
+        var h = V.p[i].h, o = V.p[1 - i];
+        if (Math.hypot(q.x - h.x, q.y - h.y) > 60) continue;
+        V.pk.splice(k, 1); taken = true;
+        if (q.type === 'slow') { o.slow = 2.6; popup(o.h.x, o.h.y - 60, 'SLOWED!', '#b14fff'); sfx('webbed'); }
+        else if (o.h.x > h.x + 40) {   // portal: swap places with the one in front
+          var sx = h.x, sy = h.y, svx = h.vx, svy = h.vy; h.x = o.h.x; h.y = o.h.y; h.vx = o.h.vx; h.vy = o.h.vy; o.h.x = sx; o.h.y = sy; o.h.vx = svx; o.h.vy = svy;
+          h.rope = null; o.h.rope = null; popup(h.x, h.y - 60, 'PORTAL SWAP!', '#7df9ff'); sfx('perfect'); burst(h.x, h.y, '#7df9ff', 16); burst(o.h.x, o.h.y, '#7df9ff', 16);
+        } else { h.stars += 3; popup(h.x, h.y - 60, 'Portal: +3 stars', '#7df9ff'); sfx('star'); }
+      }
+      if (!taken && q.x < Math.min(V.p[0].h.x, V.p[1].h.x) - 1200) V.pk.splice(k, 1);
+    }
+  }
+  function drawVsPickups(t) {
+    var V = game.versus; if (!V || !V.pk) return;
+    V.pk.forEach(function (q) {
+      if (!onScreen(q.x, q.y, 60)) return;
+      var x = SX(q.x), y = SY(q.y + Math.sin(t * 3 + q.x) * 8), r = 24 * scale + 6, col = q.type === 'portal' ? '#7df9ff' : '#b14fff';
+      ctx.fillStyle = col; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(x, y, r * 1.5, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, r, t * 4, t * 4 + 5); ctx.stroke();
+      text(q.type === 'portal' ? 'SWAP' : 'SLOW', x, y, Math.max(10, r * 0.55), '#ffffff', 'center', '900');
+    });
+  }
+  function drawVsTags(p, i) {   // P1 / P2 tag + taunt bubble + stun cocoon above each hero
+    var x = SX(hero.x), y = SY(hero.y), size = TUNING.heroSize * scale * heroSizeMod();
+    var V0 = game.versus;
+    if (V0.mode === 'tag' && V0.it === i) { ctx.fillStyle = 'rgba(255,40,40,' + (0.25 + 0.15 * Math.sin(game.time * 10)) + ')'; ctx.beginPath(); ctx.arc(x, y, size * 0.7, 0, 6.283); ctx.fill(); text('IT!', x, y - size * 0.62 - 44, 22, '#ff3b3b'); }
+    if (p.slow > 0) { ctx.fillStyle = 'rgba(177,79,255,0.45)'; ctx.beginPath(); ctx.ellipse(x, y + size * 0.3, size * 0.5, size * 0.2, 0, 0, 6.283); ctx.fill(); }
+    ctx.fillStyle = VS_COLORS[i]; ctx.beginPath(); ctx.moveTo(x - 8, y - size * 0.62 - 14); ctx.lineTo(x + 8, y - size * 0.62 - 14); ctx.lineTo(x, y - size * 0.62 - 4); ctx.fill();
+    text('P' + (i + 1), x, y - size * 0.62 - 24, 15, VS_COLORS[i], 'center', '900');
+    if (p.stun > 0) { ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; for (var k = 0; k < 5; k++) { ctx.beginPath(); ctx.ellipse(x, y, size * 0.4, size * 0.55, k * 0.6 + game.time, 0, 6.283); ctx.stroke(); } }
+    var V = game.versus;
+    if (V.say && V.say.i === i) { ctx.globalAlpha = Math.min(1, V.say.life * 3); text(V.say.text, x, y - size * 0.62 - 78, 16, '#ffffff', 'center', '900'); ctx.globalAlpha = 1; }
+  }
+
   /* ---------- FUN MODIFIERS screen (Settings) ---------- */
   function funLayout() {
     var bw = Math.min(320, screenW * 0.82), bh = Math.max(40, Math.min(56, (screenH - safe.top - safe.bottom - 140) / 5 - 10)), g = 10;
@@ -5325,12 +5777,13 @@
     var ph = Math.max(36, Math.min(46, avail * 0.065)), pw = Math.min(340, W - 40);
     var power = { x: (screenW - pw) / 2, y: y, w: pw, h: ph };
     y += ph + avail * 0.025;
-    var bigH = Math.max(50, Math.min(70, avail * 0.1)), bigW = Math.min(200, (W - 36) / 3);
-    var story = { x: screenW / 2 - bigW * 1.5 - 8, y: y, w: bigW, h: bigH }, endless = { x: screenW / 2 - bigW / 2, y: y, w: bigW, h: bigH }, daily = { x: screenW / 2 + bigW / 2 + 8, y: y, w: bigW, h: bigH };
+    var bigH = Math.max(50, Math.min(70, avail * 0.1)), bigW = Math.min(190, (W - 44) / 4), bx1 = (screenW - (bigW * 4 + 24)) / 2;
+    var big = function (k) { return { x: bx1 + k * (bigW + 8), y: y, w: bigW, h: bigH }; };
+    var story = big(0), endless = big(1), daily = big(2), versus = big(3);
     y += bigH + avail * 0.025;
     var bh = Math.max(42, Math.min(52, avail * 0.075)), g2 = 8, bw = Math.min(150, (W - 24 - g2 * 3) / 4), bx0 = (screenW - (bw * 4 + g2 * 3)) / 2;
     function btn(k) { return { x: bx0 + k * (bw + g2), y: y, w: bw, h: bh }; }
-    return { top: top, titleH: titleH, cards: cards, prev: prev, next: next, power: power, story: story, endless: endless, daily: daily,
+    return { top: top, titleH: titleH, cards: cards, prev: prev, next: next, power: power, story: story, endless: endless, daily: daily, versus: versus,
              shop: btn(0), medals: btn(1), maker: btn(2), settings: btn(3), below: y + bh, bottom: bottom, pages: pages, page: page };
   }
   function drawTitle(t) {
@@ -5391,6 +5844,7 @@
     button(L.endless, 'ENDLESS', '#4f8bff');
     var dI = dailyInfo();
     button(L.daily, 'DAILY', '#ff9f1c');
+    button(L.versus, '2 PLAYER', '#ff4f9a');
     if (dI.streak > 0) { ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(L.daily.x + L.daily.w - 12, L.daily.y + 12, 13, 0, 6.283); ctx.fill(); text('' + dI.streak, L.daily.x + L.daily.w - 12, L.daily.y + 13, 13, '#ffffff', 'center', '900'); }
     button(L.shop, 'SHOP ' + bank, '#ffd23f', '#ffffff');
     button(L.medals, 'MEDALS ' + medalCount() + '/' + MEDALS.length, '#ff9f1c');
@@ -5415,6 +5869,7 @@
     if (inRect(px, py, L.story)) { openMap(); return; }
     if (inRect(px, py, L.endless)) { startEndless(); return; }
     if (inRect(px, py, L.daily)) { startDaily(); return; }
+    if (inRect(px, py, L.versus)) { openVersus(); return; }
     if (inRect(px, py, L.shop)) { game.state = 'shop'; sfx('select'); return; }
     if (inRect(px, py, L.medals)) { game.state = 'medals'; sfx('select'); return; }
     if (inRect(px, py, L.maker)) { openMaker('hero'); return; }
@@ -5912,10 +6367,12 @@
 
   // ---- buddies: Rosa's heroes fly along in their levels and help (hearts charm, briefcases web)
   //   level option  buddy: 'id'  or  buddy: ['id', 'id']   (a buddy that is the hero you play is skipped)
-  var BUDDY_SPOTS = [{ ox: -150, oy: -130 }, { ox: -230, oy: -40 }];
+  var BUDDY_SPOTS = [{ ox: -160, oy: -150 }, { ox: -260, oy: -50 }, { ox: -340, oy: -190 }, { ox: -110, oy: -260 }, { ox: -430, oy: -90 }];   // one each: nobody stacks
   var BUDDY_LINES = {
     hearts: ['Hearts away!', 'Be NICE!', 'Love you, bye!', 'Hug attack!'],
-    other:  ['Classified.', 'Briefcase deployed.', 'Mission: help.', 'Shhh. Got it.']
+    other:  ['Classified.', 'Briefcase deployed.', 'Mission: help.', 'Shhh. Got it.'],
+    cheer:  ['Go go GO!', 'Nice swing!', 'You got this!', 'Woo-hoo!', 'Higher!', 'Team up!', 'Awesome!'],
+    power:  { ice: 'FREEZE!', rock: 'ROCK ON!', heart: 'CHARMED!', web: 'WEB NET!' }
   };
   function buddyIds() {
     var L = game.level, me = currentCharacter().id;
@@ -5931,17 +6388,45 @@
       var ch = charById(b.id), spot = BUDDY_SPOTS[b.slot % BUDDY_SPOTS.length];
       b.t += dt;
       // follow as an offset from the hero, so they keep up even at top speed
-      var ty = Math.max(cam.y + 110, hero.y + spot.oy) + Math.sin(b.t * 2) * 20 - hero.y;
-      b.ox += (spot.ox + Math.sin(b.t * 0.7) * 30 - b.ox) * Math.min(1, dt * 2); b.oy += (ty - b.oy) * Math.min(1, dt * 2.5);
+      var aheadX = game.level && game.level.buddyAhead ? 280 : spot.ox;   // the race: she stays just ahead of you
+      var sw = ch.fly ? 0 : Math.sin(b.t * 2.6 + b.slot) * 55;           // swinging on their own web
+      var ty = Math.max(cam.y + 110, hero.y + spot.oy) + (ch.fly ? Math.sin(b.t * 2) * 20 : -Math.abs(Math.cos(b.t * 2.6 + b.slot)) * 30) - hero.y;
+      if (b.dash) { b.dash.t -= dt; if (b.dash.t <= 0) b.dash = null; }
+      var wantX = b.dash ? b.dash.x - hero.x : aheadX + sw, wantY = b.dash ? b.dash.y - hero.y : ty;
+      b.ox += (wantX - b.ox) * Math.min(1, dt * (b.dash ? 5 : 2.4)); b.oy += (wantY - b.oy) * Math.min(1, dt * (b.dash ? 5 : 2.5));
+      if (Math.hypot(b.ox, b.oy) < 110) { b.ox -= 140 * dt * 3; b.oy -= 60 * dt * 3; }   // never sit on top of the hero
       b.x = hero.x + b.ox; b.y = hero.y + b.oy;
+      b.acts = b.acts || 0; b.style = b.style || ropeStyle(ch);
+      // grab stars near them for you
+      b.starCool = (b.starCool || 0) - dt;
+      if (b.starCool <= 0) {
+        for (var si = 0; si < world.stars.length; si++) { var st = world.stars[si];
+          if (Math.hypot(st.x - b.x, st.y - b.y) < 140) { world.stars.splice(si, 1); hero.stars++; popup(st.x, st.y - 20, '+1 ' + ch.name.split(' ')[0], '#ffd23f'); sfx('star'); b.acts++; b.starCool = 0.7; break; }
+          if (!b.dash && st.x > b.x - 100 && Math.hypot(st.x - b.x, st.y - b.y) < 420 && Math.random() < dt * 1.5) { b.dash = { x: st.x, y: st.y, t: 0.8 }; break; } }
+      }
+      // cheer
+      b.cheer = (b.cheer === undefined ? 3 + b.slot * 1.7 : b.cheer) - dt;
+      if (b.cheer <= 0 && !b.say) { var cl = (ch.lines && ch.lines.length && Math.random() < 0.4) ? ch.lines : BUDDY_LINES.cheer; b.say = { text: cl[Math.floor(Math.random() * cl.length)], life: 1.8 }; b.cheer = 5 + Math.random() * 3; b.acts++; }
+      // power move
+      b.pow = (b.pow === undefined ? 6 + b.slot * 2 : b.pow) - dt;
+      if (b.ring) { b.ring.t += dt; if (b.ring.t > 0.7) b.ring = null; }
+      if (b.pow <= 0) {
+        b.pow = 8 + Math.random() * 3; b.acts++; b.ring = { t: 0, style: b.style };
+        b.say = { text: BUDDY_LINES.power[b.style], life: 1.4 };
+        var mode = b.style === 'ice' ? 'ice' : b.style === 'rock' ? 'rock' : b.style === 'heart' ? 'charm' : null;
+        world.hazards.forEach(function (h) { if (!h.webbed && !h.dead && Math.hypot(h.x - b.x, h.y - b.y) < 420) webEnemy(h, mode); });
+        sfx(b.style === 'rock' ? 'shoot' : 'perfect');
+        for (var pq = 0; pq < 10; pq++) particles.push({ x: b.x, y: b.y, vx: Math.cos(pq * 0.63) * 260, vy: Math.sin(pq * 0.63) * 260, life: 0.5, color: b.style === 'ice' ? '#7df9ff' : b.style === 'heart' ? '#ff4f9a' : b.style === 'rock' ? '#ffb347' : '#ffffff', g: 0 });
+      }
       b.cool -= dt;
       if (b.cool <= 0) {
         var best = null, bd = 760;
-        world.hazards.forEach(function (h) { if (h.webbed || h.dead || h.x < b.x) return; var d = Math.hypot(h.x - b.x, h.y - b.y); if (d < bd) { bd = d; best = h; } });
+        world.hazards.forEach(function (h) { if (h.webbed || h.dead || h.x < hero.x - 200) return; var d = Math.hypot(h.x - b.x, h.y - b.y); if (d < bd) { bd = d; best = h; } });
+        bd = Math.max(bd, 1); if (best) b.acts++;
         if (best) {
           var dx = best.x - b.x, dy = best.y - b.y, L2 = Math.hypot(dx, dy) || 1;
           world.webBalls.push({ x: b.x, y: b.y, vx: dx / L2 * TUNING.webBallSpeed, vy: dy / L2 * TUNING.webBallSpeed - 120, life: 1.1, spin: 0, heart: !!ch.hearts, kase: ch.shot === 'case', ice: ch.shot === 'ice', look: ch.shot });
-          b.cool = 3.2 + b.slot * 0.6; sfx('shoot');
+          b.cool = 1.6 + b.slot * 0.3; sfx('shoot');
           if (Math.random() < 0.5) { var ls = ch.hearts ? BUDDY_LINES.hearts : BUDDY_LINES.other; b.say = { text: ls[Math.floor(Math.random() * ls.length)], life: 1.6 }; }
         } else b.cool = 0.5;
       }
@@ -5954,11 +6439,21 @@
       var ch = charById(b.id), size = (ch.fly ? 100 : 92) * scale, x = SX(b.x), y = SY(b.y);
       if (ch.hearts) drawLoveHearts(x, y, size, t, 5, 'back');
       else drawMysteryPuffs(x, y + size * 0.48, size * 0.7, t);
-      drawCharacter(ch, x, y, size, Math.sin(t * 3 + b.slot) * 0.1, t, 0, 0, null, 1, 1);
+      if (!ch.fly) {   // their own web line up to the sky
+        var px = x - Math.sin(b.t * 2.6 + b.slot) * 90 * scale, py = y - 260 * scale;
+        ctx.strokeStyle = b.style === 'heart' ? '#ff8ab3' : b.style === 'rock' ? '#8a6a4a' : b.style === 'ice' ? '#7df9ff' : 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = Math.max(1.5, 2.4 * scale); if (b.style === 'rock') ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(x, y - size * 0.35); ctx.lineTo(px, py); ctx.stroke(); ctx.setLineDash([]);
+      }
+      if (b.ring) { ctx.strokeStyle = b.ring.style === 'ice' ? '#7df9ff' : b.ring.style === 'heart' ? '#ff4f9a' : b.ring.style === 'rock' ? '#ffb347' : '#ffffff'; ctx.globalAlpha = 1 - b.ring.t / 0.7; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(x, y, (60 + b.ring.t * 500) * scale, 0, 6.283); ctx.stroke(); ctx.globalAlpha = 1; }
+      drawCharacter(ch, x, y, size, ch.fly ? Math.sin(t * 3 + b.slot) * 0.1 : -Math.sin(b.t * 2.6 + b.slot) * 0.35, t, 0, 0, null, 1, 1);
       if (ch.hearts) drawLoveHearts(x, y, size, t, 5, 'front', 2);
       if (b.say) {
         ctx.globalAlpha = Math.min(1, b.say.life * 3);
-        text(b.say.text, x, y - size * 0.75, Math.max(13, 16 * scale), ch.hearts ? '#ff8ab3' : '#c9cfe0', 'center', '900');
+        var bfs = Math.max(13, 16 * scale); ctx.font = '900 ' + Math.round(bfs) + 'px "Trebuchet MS", system-ui, sans-serif';
+        var bw2 = ctx.measureText(b.say.text).width + 16, bh2 = bfs * 1.6; ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#151a3a'; ctx.lineWidth = 2;
+        roundRect(x - bw2 / 2, y - size * 0.75 - bh2 / 2, bw2, bh2, bh2 / 2); ctx.fill(); ctx.stroke();
+        text(b.say.text, x, y - size * 0.75, bfs, ch.hearts ? '#d6246a' : '#151a3a', 'center', '900');
         ctx.globalAlpha = 1;
       }
     });
@@ -6604,6 +7099,7 @@
     game.power = currentPower();
     game.bigbotDone = false;
     game.rescued = 0; game.heartsLost = 0; game.goalDone = false; game.endT = 0; game.crabBeaten = false; game.bonusOk = false; game.bossesBeaten = 0;
+    game.cp = null; game.cpUses = 0; game.intro = L ? 3.4 : 0;
     applyMods();
     game.bossTalk = null; game.goalMsg = null;
     resetWorld(startX);
@@ -6634,6 +7130,21 @@
 
   function gameOver(reason) {
     if (game.state !== 'play') return;
+    if (game.versus) { vsFall(); return; }
+    if (game.level && game.cp && !game.goalDone) {   // mid-level checkpoint: back you go, no restart
+      var lim = save.difficulty === 'hard' ? 1 : save.difficulty === 'normal' ? 3 : 99;
+      if ((game.cpUses || 0) < lim) {
+        game.cpUses = (game.cpUses || 0) + 1;
+        var cb = null; world.buildings.forEach(function (bb) { if (!cb && bb.x + bb.w > game.cp.x - 20) cb = bb; });
+        if (!cb) cb = world.buildings[0];
+        hero.x = cb.x + Math.min(40, cb.w / 2); hero.y = cb.top - TUNING.heroRadius; hero.vx = TUNING.runSpeed; hero.vy = 0;
+        hero.rope = null; hero.zip = null; hero.onRoof = true; hero.climbing = null; hero.hurt = 1.6;
+        if (reason === 'hearts') hero.hearts = Math.max(2, hero.hearts); else game.heartsLost++;
+        if (!isFinite(hero.x)) hero.x = game.cp.x;
+        updateCamera(0, true); banner('BACK TO CHECKPOINT!', '#3ddc84'); sfx('select');
+        return;
+      }
+    }
     game.state = 'over';
     game.reason = reason;
     game.overTime = 0;
@@ -6672,13 +7183,22 @@
     if (game.slowmo > 0) { game.slowmo -= dt; dt *= 0.4; }
     // camera zooms out a little when you go fast (or fight the boss)
     var spd = Math.hypot(hero.vx, hero.vy);
-    var zt = game.state === 'play' ? 1 - clamp((spd - 600) / 1000, 0, 0.16) - (world.finalBoss ? 0.1 : 0) - (world.crab ? 0.08 : 0) : 1;
+    var zt = game.versus && game.versus.p ? clamp((screenW / baseScale) / (Math.abs(game.versus.p[0].h.x - game.versus.p[1].h.x) + 900), 0.55, 1) : game.state === 'play' ? 1 - clamp((spd - 600) / 1000, 0, 0.16) - (world.finalBoss ? 0.1 : 0) - (world.crab ? 0.08 : 0) : 1;
     game.zoom += (zt - game.zoom) * Math.min(1, realDt * 1.5);
     applyZoom();
     stepWeather(realDt);
     if (game.goalMsg) game.goalMsg.life -= realDt;
     if (game.state === 'play' && game.tutorial) {   // power how-to card: the game waits
       if (game.shopMsg) game.shopMsg.life -= dt;
+      updateCamera(dt, false);
+      return;
+    }
+    if (game.state === 'play' && game.versus) {
+      game.playTime += dt;
+      vsUpdate(dt, realDt);
+      stepWorld(dt); stepEffects(dt); stepLoveHearts(dt);
+      extendWorld(cam.x + viewW + 800); pruneWorld(Math.min(game.versus.p[0].h.x, game.versus.p[1].h.x) - 900);
+      if (game.banner) game.banner.life -= dt;
       updateCamera(dt, false);
       return;
     }
@@ -6710,6 +7230,8 @@
         }
       }
       if (game.state === 'play') { collect(); checkGoal(); }
+      if (game.level && hero.onRoof && !game.goalDone && hero.x > (game.cp ? game.cp.x : 0) + 2600) { game.cp = { x: hero.x }; popup(hero.x, hero.y - 70, 'CHECKPOINT!', '#3ddc84'); sfx('perfect'); }
+      if (game.intro > 0) game.intro -= realDt;
       stepWorld(dt);
       // trail positions
       if (!hero.onRoof) hero.trail.push({ x: hero.x, y: hero.y }); else if (hero.trail.length) hero.trail.shift();
@@ -6828,7 +7350,7 @@
     importSave: importSave, parseSaveCode: parseSaveCode, flushProgress: flushProgress, snapshot: snapshot, storageWarning: storageWarning,
     openSaveCode: openSaveCode, mergeSnapshots: mergeSnapshots, fullSnapshot: fullSnapshot, closeSaveCode: closeSaveCode, game: game, hero: hero, world: world, TUNING: TUNING, CHARACTERS: CHARACTERS,
     start: function () { if (DEBUG_LEVEL) playLevel(clamp(DEBUG_LEVEL - 1, 0, LEVELS.length - 1), true); else startEndless(); }, press: apiPress,
-    playLevel: playLevel, openMap: openMap, startDaily: startDaily, dailySetup: dailySetup, LEVELS: LEVELS, save: function () { return save; }, riff: riff, showStory: showStory, openMaker: openMaker, maker: maker,
+    playLevel: playLevel, openMap: openMap, goalProgress: function () { return goalProgress(); }, startDaily: startDaily, openVersus: openVersus, startVersus: startVersus, vsSel: vsSel, vs: function () { return game.versus; }, vsFire: vsFire, webPull: webPull, gameRef: function () { return game; }, heroRef: function () { return hero; }, dailySetup: dailySetup, LEVELS: LEVELS, save: function () { return save; }, riff: riff, showStory: showStory, openMaker: openMaker, maker: maker,
     usePower: usePower, spawnEnemy: spawnEnemy, startCrab: startCrab, mapLayout: apiLayout(mapLayout), mapCardLayout: apiLayout(mapCardLayout), levelEndLayout: apiLayout(levelEndLayout),
     settingsLayout: apiLayout(settingsLayout), citizens: function () { return world.citizens; }, goalProgress: goalProgress, powerButtonRect: apiLayout(powerButtonRect),
     startCharge: startCharge, releaseCharge: releaseCharge, POWERS: POWERS, storyLayout: apiLayout(storyLayout), dismissTutorial: dismissTutorial,
