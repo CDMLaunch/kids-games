@@ -7183,15 +7183,16 @@
       return;
     }
     var L = game.level, i = game.levelIndex;
-    if (!L || L.rematch || L.bonusGen || game.remix || i < 2 || i >= LEVELS.length - 1 || game.coach || game.tutorial) return;
+    if (!L || L.rematch || L.bonusGen || game.remix || i >= LEVELS.length - 1 || game.tutorial) return;   // round 23: from Level 1 on
+    if (game.coach && r21L.sec < 8) return;   // Level 1: let the coach's first hint land first
     if (game.goalDone && !r21L.winQ) return;
     if (r21L.winQ) { r21L.winQ.t -= dt; if (r21L.winQ.t <= 0) { r21L.done = true; r21LionSay(r21L.winQ.line, 'win'); r21L.winQ = null; } return; }
     if (r21LevelHasBoss(L, i)) return;   // boss levels: he speaks up after the boss is beaten
     if (world.crab || world.finalBoss) return;
-    if (i % 2 === 0 && r21L.sec > 3 && !(game.banner && game.banner.life > 0) && !(game.intro > 0)) {   // wait until the level banners are gone
+    if (i % 2 === 0 && r21L.sec > (i === 0 ? 8 : 3) && (!(game.banner && game.banner.life > 0) || r21L.sec > 12) && !(game.intro > 0)) {   // wait until the level banners are gone
       var pool = LIONL.taunt.concat(r21DogNear() ? LIONL.dogs : []);
       r21L.done = true; r21LionSay(r21LionPick(pool, i * 7 + r21L.run), 'start');
-    } else if (i % 2 === 1 && r21L.sec > (r21Easy() ? 30 : 45)) {
+    } else if (i % 2 === 1 && r21L.sec > (r21Easy() ? 10 : 14) && (!(game.banner && game.banner.life > 0) || r21L.sec > 20)) {   // round 23: was 30/45 s - most levels ended first
       r21L.done = true; r21LionSay(r21LionPick(LIONL.mid, i * 5 + r21L.run), 'mid');
     }
   }
@@ -8923,7 +8924,7 @@
     c.state = 'saved'; c.home = b; c.x = clamp(hero.x + 30, b.x + 14, b.x + b.w - 14); c.y = b.top - 18;
     var thanks = CITIZEN_THANKS[c.kind] || CITIZEN_THANKS.kid;
     c.bubble = thanks[Math.floor(Math.random() * thanks.length)]; c.bubbleT = 2.4;
-    game.rescued++; game.stats.rescued++;
+    game.rescued++; game.stats.rescued++; hero.saves = (hero.saves || 0) + 1;   // round 23: who saved them (2P MVP)
     hero.stars += 3;
     trick(50, 'RESCUED!', '#3ddc84'); r21EmoteFire();
     burst(c.x, c.y - 10, '#ff8ab3', 16, 'confetti');
@@ -10680,6 +10681,11 @@
     game.versus = { mode: vm, t: vm === 'tag' ? 60 : vm === 'team' ? 120 : VS_TIME, count: 4.4, it: Math.random() < 0.5 ? 0 : 1, itT: [0, 0], immune: 0, pickX: 1400, pk: [], prevChar: prevChar, lead: -1, tauntT: 0,
                     p: [{ h: h1, ch: vsSel.p[0], held: false, stun: 0, safe: 0, hits: 0, pen: 0, falls: 0 }, { h: h2, ch: vsSel.p[1], held: false, stun: 0, safe: 0, hits: 0, pen: 0, falls: 0 }] };
     game.versus.emo = [null, null]; game.versus.emoI = [0, 0]; game.versus.round = (vsSel.played || 0) + 1;
+    h1.saves = 0; h2.saves = 0; game.versus.rn = vsSel.rounds || 3;
+    if (vm === 'team') {   // round 23: Team Rescue plays real rounds too (1 / 3 / 5): points + saves carry over, MVP at the end
+      var TS = vsSel.teamS; if (!TS || TS.done || TS.n !== game.versus.rn) TS = vsSel.teamS = { n: game.versus.rn, r: 0, pts: 0, saved: 0, won: 0, st: [0, 0], sv: [0, 0], done: false };
+      TS.r++; game.versus.round = TS.r;
+    }
     world.hazards = []; vsNoBosses(); game.banner = null; if (vm === 'team') { world.nextCitizenX = hero.x + 700; world.safeCount = 2; }
     music.track = 'boss';
     if (net && net.host) netHostStarted();   // round 18: tell the friend's device
@@ -10862,13 +10868,23 @@
       TV.result = { team: sc, best: Math.max(best, sc), newBest: sc > best, w: -1, a: TV.p[0].h.stars, b: TV.p[1].h.stars, rescued: game.rescued };
       if (sc > best) { save.teamBest = sc; writeSave(); mirrorNow(); }
       TV.result.goal = VS_TEAM_GOAL; TV.result.won = game.rescued >= VS_TEAM_GOAL; vsPlayTogether(TV.result);
+      var TS = vsSel.teamS;
+      if (TS) {   // round 23: carry the round into the series
+        TS.pts += sc; TS.saved += game.rescued; TS.won += TV.result.won ? 1 : 0;
+        TV.p.forEach(function (p, i) { TS.st[i] += p.h.stars; TS.sv[i] += p.h.saves || 0; });
+        TS.done = TS.r >= TS.n;
+        var m0 = TS.st[0] + TS.sv[0] * 10, m1 = TS.st[1] + TS.sv[1] * 10;
+        TV.result.round = TS.r; TV.result.rn = TS.n; TV.result.champ = TS.done; TV.result.mvp = m0 === m1 ? -1 : m0 > m1 ? 0 : 1;
+        TV.result.series = { pts: TS.pts, saved: TS.saved, won: TS.won, st: TS.st.slice(), sv: TS.sv.slice() };
+        TV.result.sa = TV.p[0].h.saves || 0; TV.result.sb = TV.p[1].h.saves || 0;
+      }
       if (game.rescued >= 5) medal('vsteam');
       game.state = 'vsEnd'; game.overTime = 0; TV.p.forEach(function (p) { p.held = false; p.h.rope = null; });
       for (var ti = 0; ti < 6; ti++) burst(hero.x + rand(-200, 200), hero.y - rand(50, 250), ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff'][ti % 4], 18, 'confetti');
       sfx('victory'); crowdCheer(true); announce(TV.result.newBest ? 'teamBest' : 'team', 2); return;
     }
     var V = game.versus, a = vsScore(0), b = vsScore(1), w = a === b ? -1 : (a > b) !== (V.mode === 'tag') ? 0 : 1;
-    if (w >= 0) { vsSel.wins[w]++; if (!net || w === net.me) medal('vswin'); if (vsSel.wins[w] >= 2) medal('vschamp'); if (V.mode === 'tag') medal('vstag'); }
+    if (w >= 0) { vsSel.wins[w]++; if (!net || w === net.me) medal('vswin'); if (vsSel.wins[w] >= vsNeed() && (vsSel.rounds || 3) >= 3) medal('vschamp'); if (V.mode === 'tag') medal('vstag'); }
     vsSel.played = (vsSel.played || 0) + 1; vsSel.tieRun = w < 0 && (vsSel.wins[0] || vsSel.wins[1]) > 0;
     V.result = { a: a, b: b, w: w, champ: w >= 0 && vsSel.wins[w] >= vsNeed(), round: V.round };
     vsPlayTogether(V.result);
@@ -10891,7 +10907,7 @@
   function vsPlayTogether(R) {   // a small thank-you for playing together (into the star bank)
     R.prize = R.mode === 'team' || game.versus.mode === 'team' ? (R.won ? 8 : 5) : 5; bank += R.prize; saveShop();
   }
-  function vsSeriesOn() { return game.versus && game.versus.mode !== 'team' && (vsSel.rounds || 3) > 1; }
+  function vsSeriesOn() { return !!game.versus && (vsSel.rounds || 3) > 1; }   // round 23: Team Rescue has rounds too
   function vsEndUpdate(dt) {
     var V = game.versus; if (!V || !V.result) return;
     if (net && !net.host) return;   // online: the host moves everyone on
@@ -10918,13 +10934,15 @@
     ctx.fillStyle = 'rgba(15,18,50,0.7)'; ctx.fillRect(0, 0, screenW, screenH);
     if (game.overTime % 0.5 < 0.02) burst(cam.x + viewW * Math.random(), cam.y + 50, ['#ff3b3b', '#ffd23f', '#3ddc84', '#4f8bff'][Math.floor(Math.random() * 4)], 10, 'confetti');
     var big = clamp(Math.min(screenW / 13, screenH / 11), 22, 50), top = safe.top + 14 + big;
-    var title = team ? (R.won ? 'TEAM RESCUE! YOU DID IT TOGETHER!' : 'SO CLOSE, TEAM!') : R.w < 0 ? 'IT\'S A TIE!' : R.champ ? 'PLAYER ' + (R.w + 1) + ' IS THE CHAMPION!' : 'PLAYER ' + (R.w + 1) + ' WINS ROUND ' + (R.round || 1) + '!';
+    var TSr = team && R.series && R.rn > 1;
+    var title = TSr ? (R.champ ? (R.series.won * 2 >= R.rn ? 'TEAM CHAMPIONS!' : 'GREAT TEAMWORK!') : 'ROUND ' + R.round + ' OF ' + R.rn + (R.won ? ' - DONE!' : ' - NICE TRY!')) : team ? (R.won ? 'TEAM RESCUE! YOU DID IT TOGETHER!' : 'SO CLOSE, TEAM!') : R.w < 0 ? 'IT\'S A TIE!' : R.champ ? 'PLAYER ' + (R.w + 1) + ' IS THE CHAMPION!' : 'PLAYER ' + (R.w + 1) + ' WINS ROUND ' + (R.round || 1) + '!';
     drawTitlePill(title, top, big, team ? (R.won ? '#3ddc84' : '#ffd23f') : R.w >= 0 ? '#ffd23f' : '#7df9ff');
     // the score card
     var cw = Math.min(screenW - 30, 520), cy0 = top + big * 1.1, chh = O.top - cy0 - 12, cx0 = (screenW - cw) / 2;
     ctx.fillStyle = 'rgba(255,248,230,0.96)'; roundRect(cx0, cy0, cw, chh, 18); ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#ffd23f'; ctx.stroke();
     var fs = clamp(chh / 12, 12, 20), sub;
     if (team) sub = R.team + ' team points  \u00b7  saved ' + R.rescued + ' / ' + R.goal + '  \u00b7  best ' + R.best + (R.newBest ? '  NEW BEST!' : '');
+    if (TSr) sub = 'Round ' + R.round + ' / ' + R.rn + '  \u00b7  this round ' + R.team + ' pts, saved ' + R.rescued + '  \u00b7  TOTAL ' + R.series.pts + ' pts, saved ' + R.series.saved;
     else sub = (vsSel.rounds > 1 ? 'Best of ' + vsSel.rounds + '  \u00b7  Round ' + (R.round || 1) + '  \u00b7  ' : '') + 'P1 ' + vsSel.wins[0] + ' - ' + vsSel.wins[1] + ' P2';
     text(sub, screenW / 2, cy0 + fs * 1.1, fitSize(sub, fs, cw - 20), '#151a3a', 'center', '900');
     var sz = Math.min(chh * 0.5, cw * 0.26), hy = cy0 + fs * 2 + sz * 0.62;
@@ -10934,7 +10952,9 @@
       if (win && !team) drawCrown(x, yy - sz * 0.62, sz * 0.14);
       if (ch.hearts) drawLoveHearts(x, yy, sz * (win ? 1 : 0.85), t, 5, 'back');
       drawCharacter(ch, x, yy, sz * (win ? 1 : 0.85), win ? Math.sin(t * 4) * 0.1 : 0, t, 0, 0, null);
-      var sc = team ? (i ? R.b : R.a) + ' stars' : (i ? R.b : R.a) + (V.mode === 'race' ? ' m' : V.mode === 'tag' ? ' s IT' : ' pts');
+      if (team && R.series && (R.champ || !(R.rn > 1)) && R.mvp === i) { r22Star(x, yy - sz * 0.66, sz * 0.13); text('MVP', x, yy - sz * 0.66 + sz * 0.2, Math.max(12, sz * 0.12), '#d4a000', 'center', '900'); }
+      if (team && R.series && R.mvp === -1 && (R.champ || !(R.rn > 1))) r22Star(x, yy - sz * 0.66, sz * 0.1);
+      var sc = team && R.series ? (R.champ && R.rn > 1 ? R.series.st[i] + ' stars, ' + R.series.sv[i] + ' saved' : (i ? R.b : R.a) + ' stars, ' + (i ? R.sb : R.sa) + ' saved') : team ? (i ? R.b : R.a) + ' stars' : (i ? R.b : R.a) + (V.mode === 'race' ? ' m' : V.mode === 'tag' ? ' s IT' : ' pts');
       var pl = 'P' + (i + 1) + ' ' + ch.name, pw = Math.min(cw * 0.46, measure(pl, fs) + 24);
       ctx.fillStyle = cols[i]; roundRect(x - pw / 2, hy + sz * 0.5, pw, fs * 1.5, fs * 0.75); ctx.fill();
       var dark = hexRgb(cols[i]).reduce(function (a, b) { return a + b; }, 0) > 560;
@@ -10945,7 +10965,7 @@
     text(pz, screenW / 2, cy0 + chh - fs * 0.9, fitSize(pz, fs * 0.9, cw - 20), '#2a9d55', 'center', '900');
     if (game.overTime > 0.8) {
       var auto = vsSeriesOn() && !R.champ, left = Math.max(0, Math.ceil(VS_AUTO_NEXT - game.overTime));
-      button(O.rematch, R.champ ? 'NEW SERIES' : auto ? 'NEXT ROUND ' + left : team ? 'PLAY AGAIN' : 'REMATCH!', '#3ddc84');
+      button(O.rematch, R.champ && team ? 'PLAY AGAIN' : R.champ ? 'NEW SERIES' : auto ? 'NEXT ROUND ' + left : team ? 'PLAY AGAIN' : 'REMATCH!', '#3ddc84');
       button(O.swap, 'SWAP HEROES', '#ff9f1c'); button(O.change, 'CHANGE GAME', '#b18cff'); button(O.menu, net ? 'LEAVE' : 'MENU', '#4f8bff');
     }
     if (net) {   // round 18: who is who on this device
@@ -11124,9 +11144,9 @@
       if (V.p[i].boost) text('CATCH-UP BOOST!', R.x + R.w / 2, land || i ? R.y + R.h + 10 : R.y - 10, s * 0.5, '#3ddc84', 'center', '800');
     });
     button(pr, 'II', 'rgba(15,18,50,0.6)');
-    var rl = V.mode !== 'team' && (vsSel.rounds || 3) > 1 ? '  ·  ROUND ' + (V.round || 1) + '  ·  P1 ' + vsSel.wins[0] + '-' + vsSel.wins[1] + ' P2' : '';   // Kara-style series line
+    var rl = V.mode === 'team' && (V.rn || 1) > 1 ? '  ·  ROUND ' + (V.round || 1) + ' / ' + V.rn : V.mode !== 'team' && (vsSel.rounds || 3) > 1 ? '  ·  ROUND ' + (V.round || 1) + '  ·  P1 ' + vsSel.wins[0] + '-' + vsSel.wins[1] + ' P2' : '';   // Kara-style series line
     text(mode + '  ' + tl + 's' + rl, screenW / 2, pr.y + pr.h + 16, fitSize(mode + '  ' + tl + 's' + rl, s * 0.6, screenW * 0.5), tl <= 10 ? '#ff6b6b' : '#ffd23f', 'center', '900');
-    if (V.mode === 'team') text('TEAM ' + teamScore() + ' pts   saved ' + game.rescued + ' / ' + VS_TEAM_GOAL + (game.rescued >= VS_TEAM_GOAL ? ' ✓' : '') + '   best ' + (save.teamBest || 0), screenW / 2, pr.y + pr.h + 38, Math.max(13, s * 0.6), '#3ddc84', 'center', '900');
+    if (V.mode === 'team') text('TEAM GOAL: save ' + VS_TEAM_GOAL + '   ' + teamScore() + ' pts   saved ' + game.rescued + ' / ' + VS_TEAM_GOAL + (game.rescued >= VS_TEAM_GOAL ? ' ✓' : '') + '   best ' + (save.teamBest || 0), screenW / 2, pr.y + pr.h + 38, Math.max(13, s * 0.6), '#3ddc84', 'center', '900');
     if (V.mode === 'race') {   // progress bars to the finish
       var bw = Math.min(300, screenW * 0.4), bx = (screenW - bw) / 2, by = pr.y + pr.h + 30;
       [0, 1].forEach(function (i) { ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(bx, by + i * 9, bw, 6); ctx.fillStyle = cols[i]; ctx.fillRect(bx, by + i * 9, bw * Math.min(1, vsScore(i) / VS_RACE), 6); });
@@ -11168,6 +11188,8 @@
       drawVsControlsCard(cols, cTop, cBot, room < 90 ? cn2 : '');   // short screens: the count sits in the card title
       if (V.count <= 3.4 && room >= 90) { var n = Math.ceil(V.count) - 1, lab2 = n > 0 ? '' + n : 'GO!', kk = 1 + (V.count % 1) * 0.3, ny = (pr.y + pr.h + 40 + cTop) / 2;
         text(lab2, screenW / 2, ny, Math.min(130, screenW / 5, (cTop - pr.y - pr.h - 30) * 0.9) * kk, n > 0 ? '#ffffff' : '#3ddc84'); }
+      var ri = ((V.rn || 1) > 1 ? 'ROUND ' + (V.round || 1) + ' OF ' + V.rn + '  ·  ' : '') + (V.mode === 'team' ? 'TEAM GOAL: save ' + VS_TEAM_GOAL + ' people together!' : mode);   // round 23: round intro
+      if (V.count > 3.4 || room < 90) { var rfs = fitSize(ri, Math.max(14, s * 0.7), screenW * 0.9); ctx.fillStyle = 'rgba(15,18,50,0.8)'; roundRect(screenW / 2 - measure(ri, rfs) / 2 - 14, cTop - rfs * 2.1, measure(ri, rfs) + 28, rfs * 1.7, rfs * 0.8); ctx.fill(); text(ri, screenW / 2, cTop - rfs * 1.25, rfs, '#ffd23f', 'center', '900'); }
     }
   }
   function vsPickups(dt) {   // 2P power-ups: PORTAL (swap places) and SLOW (goo on your rival)
@@ -14033,7 +14055,7 @@
   function apiPress(x, y) { if (x == null) return press(); return withUI(function () { return press(x / UI, y / UI); }); }
   window.WebSwingCity = { feat21: { next: r21StageNext, crab: function () { return world.crab; }, roar: function (tele) { if (world.crab) { world.crab.attack = { type: 'roar', t: 0, tele: tele || 1 }; } }, roarHitNow: function () { return world.crab && roarAll(world.crab); }, fire: function (tele) { if (world.crab) { world.crab.attack = { type: 'fire', t: 0, tele: tele || 0.8 }; } }, r22F: r22F, mouth: function () { return world.crab && lionMouth(world.crab); }, bark: function () { return dadBark(); }, power: function () { return usePower(); }, buddies: function () { return world.buddies || []; }, stats: function () { return game.stats; }, fx: function () { return r21fx; }, names: { bat: BATN, cap: CAPN }, fly: toggleFly, ally: r21AllyDmg }, selectCharacter: selectCharacter, touch21: function () { return withUI(function () { return { fire: fireButtonRect(), power: hasPowerButton() ? powerButtonRect() : null, fly: canFly() ? flyButtonRect() : null, pause: pauseButtonRect(), help: helpCornerRect(), vsFire: vsFireRects(), vsHud: vsHudRects(), btn: save.btnSize || 'm', W: screenW, H: screenH, safe: { t: safe.top, r: safe.right, b: safe.bottom, l: safe.left }, medalOverflow: game.medalOverflow || 0, suit: suitLabLayout(), medals: medalsLayout(), settings: settingsLayout(), flying: !!hero.flying, ammo: hero.ammo, haptics: save.haptics }; }); }, shop21: function () { return { SHOP: SHOP, shop: shop, ui: shopUI, bank: bank, daily: r21ShopDaily(), layout: withUI(r21ShopLayout), boost: game.boost, price: shopPrice }; }, setBank: function (n) { bank = n; }, shopBuy: r21ShopBuy, r21L: r21L, r21Gems: r21Gems, r21LionFinish: r21LionFinish, r21LionSay: r21LionSay, popups: function () { return popups; }, storageState: storageState, saveCodeText: saveCodeText, saveFileText: saveFileText,
     importSave: importSave, parseSaveCode: parseSaveCode, flushProgress: flushProgress, snapshot: snapshot, storageWarning: storageWarning,
-    openSaveCode: openSaveCode, mergeSnapshots: mergeSnapshots, fullSnapshot: fullSnapshot, closeSaveCode: closeSaveCode, welcome: function () { return welcome; }, welcomeNext: welcomeNext, welcomeLayout: apiLayout(welcomeLayout), openParents: openParents, closeParents: closeParents, parentsUI: parentsUI, parentsKey: parentsKey, PARENT_LINKS: PARENT_LINKS, voiceMem: function () { return { mb: VC.mem * 4 / 1e6, clips: VC.order.length, evicted: VC.evicted, played: VC.played, fallback: VC.fallback }; }, moveCode: moveCode, moveCodeFor: moveCodeFor, parseMoveCode: parseMoveCode, openMoveGame: openMoveGame, closeMoveGame: closeMoveGame, moveUI: moveUI, moveAsk: moveAsk, moveSummary: moveSummary, QR: QR, CloudSync: CloudSync, importSnap: importSnap, anySaveSnap: anySaveSnap, game: game, hero: hero, world: world, TUNING: TUNING, CHARACTERS: CHARACTERS,
+    openSaveCode: openSaveCode, mergeSnapshots: mergeSnapshots, fullSnapshot: fullSnapshot, closeSaveCode: closeSaveCode, welcome: function () { return welcome; }, lionCam: function () { return r21L.cam; }, vsFinish: vsFinish, welcomeNext: welcomeNext, welcomeLayout: apiLayout(welcomeLayout), openParents: openParents, closeParents: closeParents, parentsUI: parentsUI, parentsKey: parentsKey, PARENT_LINKS: PARENT_LINKS, voiceMem: function () { return { mb: VC.mem * 4 / 1e6, clips: VC.order.length, evicted: VC.evicted, played: VC.played, fallback: VC.fallback }; }, moveCode: moveCode, moveCodeFor: moveCodeFor, parseMoveCode: parseMoveCode, openMoveGame: openMoveGame, closeMoveGame: closeMoveGame, moveUI: moveUI, moveAsk: moveAsk, moveSummary: moveSummary, QR: QR, CloudSync: CloudSync, importSnap: importSnap, anySaveSnap: anySaveSnap, game: game, hero: hero, world: world, TUNING: TUNING, CHARACTERS: CHARACTERS,
     start: function () { if (DEBUG_LEVEL) playLevel(clamp(DEBUG_LEVEL - 1, 0, LEVELS.length - 1), true); else startEndless(); }, press: apiPress,
     playLevel: playLevel, openMap: openMap, tapUI: function (x, y) { withUI(function () { press(x, y); }); }, layout: function (n) { return withUI(function () { return n === "suit" ? suitLabLayout() : n === "bosses" ? bossesLayout() : n === "pause" ? pauseLayout() : n === "map" ? mapLayout() : n === "mini" ? miniLayout() : n === "bonusEnd" ? bonusEndLayout() : n === "stickers" ? stickerLayout() : n === "title" ? titleLayout() : n === "season" ? seasonTitleRect(titleLayout()) : n === "medals" ? medalsLayout() : null; }); }, bank: function () { return bank; }, startRematch: startRematch, takePhoto: takePhoto, openSuitLab: openSuitLab, doTrick: doTrick, goalProgress: function () { return goalProgress(); }, startDaily: startDaily, openVersus: openVersus, startVersus: startVersus, vsSel: vsSel, vs: function () { return game.versus; }, vsFire: vsFire, webPull: webPull, gameRef: function () { return game; }, heroRef: function () { return hero; }, dailySetup: dailySetup, LEVELS: LEVELS, save: function () { return save; }, riff: riff, showStory: showStory, openMaker: openMaker, maker: maker,
     usePower: usePower, spawnEnemy: spawnEnemy, startCrab: startCrab, mapLayout: apiLayout(mapLayout), mapCardLayout: apiLayout(mapCardLayout), levelEndLayout: apiLayout(levelEndLayout),
