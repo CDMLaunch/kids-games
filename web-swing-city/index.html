@@ -433,6 +433,7 @@
   var STORAGE_MEDALS = 'webSwingCity.medals';
   var STORAGE_MUSIC = 'webSwingCity.music';
   var STORAGE_VOICES = 'webSwingCity.voices', STORAGE_VOLUME = 'webSwingCity.volume';   // round 14: Voices on/off + volume (Settings)
+  var STORAGE_COUNTS = 'webSwingCity.counts';   // round 25b: '0' = off on this device; default ON. Anonymous GoatCounter only.
 
   /* =====================================================================
    * SHOP  - things you can buy with stars. Add a line to add an item.
@@ -9507,6 +9508,63 @@
     for (i = 0; i < un && i < LEVELS.length; i++) if (!(save.levels[i] && save.levels[i].done)) return i;
     return -1;
   }
+  /* ---------- round 25b: anonymous play counts (GoatCounter). No names, no hero text, no save data, no cookies of ours.
+       Silent no-op on file://, offline, when the script fails, or when Parents turn it off. Never throws, never blocks start. ---------- */
+  var GC_ENDPOINT = 'https://sanderskidsgames.goatcounter.com/count', GC_SCRIPT = 'https://gc.zgo.at/count.js', GC_PATH = '/web-swing-city/';
+  var gc = { on: true, ready: false, queued: [], opened: false, page: false };
+  function gcWanted() {
+    try {
+      if ((function () { try { return localStorage.getItem(STORAGE_COUNTS); } catch (e) { return null; } })() === '0') return false;
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') return false;
+      if (navigator.onLine === false) return false;
+      return true;
+    } catch (e) { return false; }
+  }
+  function gcSend(ev) {
+    try {
+      if (!gcWanted()) return;
+      if (!window.goatcounter || typeof window.goatcounter.count !== 'function') { gc.queued.push(ev); return; }
+      window.goatcounter.count(ev);
+    } catch (e) { /* never block the game */ }
+  }
+  function gcEvent(path, title) { gcSend({ path: String(path), title: String(title || path), event: true }); }
+  function gcLevelTag(i) { var n = (i | 0) + 1; return 'L' + (n < 10 ? '0' : '') + n; }
+  function gcFlush() {
+    try {
+      if (!gcWanted() || !window.goatcounter || typeof window.goatcounter.count !== 'function') return;
+      gc.ready = true;
+      while (gc.queued.length) window.goatcounter.count(gc.queued.shift());
+    } catch (e) { /* ignore */ }
+  }
+  function gcBoot() {
+    try {
+      gc.on = (function () { try { return localStorage.getItem(STORAGE_COUNTS); } catch (e) { return null; } })() !== '0';
+      if (!gcWanted()) return;
+      window.goatcounter = window.goatcounter || {};
+      window.goatcounter.endpoint = GC_ENDPOINT;
+      window.goatcounter.no_onload = true;
+      window.goatcounter.path = function () { return GC_PATH; };
+      if (document.querySelector('script[data-goatcounter]')) { gcFlush(); return; }   // already loading
+      var s = document.createElement('script');
+      s.async = true; s.src = GC_SCRIPT;
+      s.setAttribute('data-goatcounter', GC_ENDPOINT);
+      s.onload = function () {
+        try {
+          gcFlush();
+          if (!gc.page) { gc.page = true; window.goatcounter.count({ path: GC_PATH, title: 'Web Swing City' }); }
+          if (!gc.opened) { gc.opened = true; gcEvent('game-open', 'Game open'); }
+        } catch (e) { /* ignore */ }
+      };
+      s.onerror = function () { /* silent: offline / blocked / file:// */ };
+      (document.head || document.documentElement).appendChild(s);
+    } catch (e) { /* never block start */ }
+  }
+  function setCounts(on) {
+    gc.on = !!on;
+    try { localStorage.setItem(STORAGE_COUNTS, on ? '1' : '0'); } catch (e) { /* ignore */ }
+    if (on) gcBoot();
+  }
+
   function finishLevel() {
     r21BoostDone();   // round 21: boosts last one level
     if (game.level && game.level.rematch) { rematchDone(); return; }
@@ -9538,6 +9596,7 @@
     if (i === WORLD9 - 1) medal('xmas');
     if (i === LION_FINAL && !L.bonusGen) medal('lionden');   // round 21
     r21LionFinish(i, rmx);   // round 21: Roar Gem scene / team victory
+    if (!rmx && !L.bonusGen && !L.rematch) try { gcEvent('level-win-' + gcLevelTag(i), 'Win ' + gcLevelTag(i)); } catch (e) { /* ignore */ }   // round 25b
     game.state = 'levelEnd'; game.overTime = 0; game.starsShown = 0;
     music.track = 'main'; world.bolts = []; hero.rope = null; hero.zip = null; input.held = false;
     sfx('medal');
@@ -9548,6 +9607,7 @@
     endDaily();
     if (remix) skipStory = true;
     endVersus();
+    try { if (!remix) gcEvent('level-start-' + gcLevelTag(i), 'Start ' + gcLevelTag(i)); } catch (e) { /* ignore */ }   // round 25b
     var go = function () { game.mode = 'story'; game.levelIndex = i; game.remix = !!remix; game.level = remix ? remixLevel(L) : r21Tune(L, i); startGame(); if (remix) banner('REMIX!', '#ff4f9a'); };
     if (L.story && !skipStory && !save.seen[L.story]) showStory(L.story, go); else go();
   }
@@ -10147,6 +10207,8 @@
         '<div style="font:900 13px system-ui,sans-serif;color:#ffd23f;margin:10px 0 3px">PRIVACY</div>' +
         '<div style="font-size:13px;color:#dfe3f5;line-height:1.4">No accounts, no ads, no in-game chat, and no personal data collected. Progress stays on this device unless you move it yourself with a code or a save file. ' +
         'Online 2-player uses a random room code only (no names), connecting the two devices through a public connection service.</div>' +
+        '<div style="font-size:13px;color:#dfe3f5;line-height:1.4;margin-top:8px">Anonymous play counts (no names or personal info)</div>' +   // round 25b
+        '<div><button id="pa-counts" style="' + B + '"></button></div>' +
       '</div>' +
       '<div style="text-align:center;margin-top:10px"><button id="pa-close" style="' + B + 'background:#4f8bff;color:#fff;min-width:140px">CLOSE</button></div></div>';
   }
@@ -10163,6 +10225,7 @@
     set('pa-voices', game.voices, 'Voices: ON', 'Voices: OFF', '#ff8ab3');
     $('pa-vol').textContent = 'Volume: ' + Math.round((game.volume || 0.75) * 100) + '%';
     set('pa-quiet', save.quiet, 'Quiet mode: ON', 'Quiet mode: OFF', '#ffd23f');
+    set('pa-counts', gc.on, 'Play counts: ON', 'Play counts: OFF', '#7df9ff');   // round 25b
     var ln = $('pa-links'); ln.innerHTML = '';
     if (!PARENT_LINKS.length) ln.innerHTML = '<div style="font-size:13px;color:#c9cfe0">No outside links in this version.</div>';
     PARENT_LINKS.forEach(function (l) { var b = document.createElement('button'); b.textContent = l.name + ' (opens outside the game)'; b.style.cssText = 'border:0;border-radius:12px;padding:9px 12px;margin:3px;font:800 14px system-ui,sans-serif;background:#e8ecff;color:#151a3a;cursor:pointer'; b.onclick = function () { try { window.open(l.url, '_blank', 'noopener,noreferrer'); } catch (e) { /* ignore */ } }; ln.appendChild(b); });
@@ -10190,6 +10253,7 @@
       $('pa-voices').onclick = function () { setVoices(!game.voices); parentsRefresh(); };
       $('pa-vol').onclick = function () { cycleVolume(); parentsRefresh(); };
       $('pa-quiet').onclick = function () { save.quiet = save.quiet ? 0 : 1; writeSave(); setSound(!save.quiet); r22ApplyQuiet(); parentsRefresh(); };
+      $('pa-counts').onclick = function () { setCounts(!gc.on); parentsRefresh(); };   // round 25b
       $('pa-move').onclick = function () { closeParents(); openMoveGame(); };
       $('pa-full').onclick = function () { closeParents(); openSaveCode(); };
       $('pa-reset').onclick = function () { closeParents(); game.state = 'settings'; game.confirmReset = true; sfx('nope'); };
@@ -10239,6 +10303,7 @@
     }
     save.knownLevels = Math.max(save.knownLevels || 0, LEVELS.length);
     writeSave(); mirrorNow();
+    try { gcEvent('roaren-jump-used', 'ROAREN jump used'); } catch (e) { /* ignore */ }   // round 25b
     return n;
   }
   // "What's new": the first launch after levels were added (only for players who already have progress)
@@ -10516,6 +10581,7 @@
   var moveUI = { el: null, open: false, pend: null, armed: false };
   function moveMsg(m, ok) { var e = document.getElementById('mv-msg'); if (e) { e.textContent = m; e.style.color = ok === false ? '#ff8a8a' : '#7dffb0'; } }
   function openMoveGame(incoming) {
+    try { gcEvent('move-my-game', 'Move my game used'); } catch (e) { /* ignore */ }   // round 25b
     if (!moveUI.el) {
       var d = document.createElement('div');
       d.id = 'movegame';
@@ -11863,6 +11929,7 @@
     net.match = true; net.mirror = false; netResync(); net.snapN = 0; net.evq = []; net.resumeT = 0; net.menu = false;
     net.rin = { h: false, f: net.rin.f, e: net.rin.e, fd: net.rin.f, ed: net.rin.e };
     netSendStart();
+    try { gcEvent('2p-online-start', '2P online start'); } catch (e) { /* ignore */ }   // round 25b
   }
   function netJoinStart(m) {
     vsSel.mode = clamp(m.mode | 0, 0, VS_MODES.length - 1); vsSel.p = m.p.map(function (id, i) { var c = charById(id); return c ? id : CHARACTERS[i].id; });
@@ -11874,6 +11941,7 @@
     world.nextBuildingX = world.nextAnchorX = world.nextHazardX = world.nextCitizenX = Infinity;
     net.match = true; net.mirror = true; net.buf = []; net.off = null; net.H = [{}, {}]; net.haveB = {}; net.haveA = {}; net.menu = false; net.endAsk = '';
     net.inp = { h: false, f: 0, e: 0 }; net.inpDirty = true; net.lastSnapRx = performance.now();
+    try { gcEvent('2p-online-start', '2P online start'); } catch (e) { /* ignore */ }   // round 25b
   }
   /* ---------- host: snapshots ---------- */
   function netNum(v) { return isFinite(v) ? Math.round(v * 100) / 100 : (v > 0 ? 1e9 : -1e9); }
@@ -14019,6 +14087,7 @@
         return;
       }
     }
+    try { if (game.level && game.levelIndex >= 0 && !game.remix) gcEvent('level-lose-' + gcLevelTag(game.levelIndex), 'Lose ' + gcLevelTag(game.levelIndex)); } catch (e) { /* ignore */ }   // round 25b
     game.state = 'over';
     game.reason = reason;
     game.overTime = 0;
@@ -14169,6 +14238,7 @@
   storageState.loading = false;
   moveBootCheck();   // round 22: opened with ?load=<code>
   if (welcomeWanted()) welcome.on = true;   // round 22: first-time welcome
+  try { gcBoot(); } catch (e) { /* round 25b: never block start */ }
   function progressSig() { try { return JSON.stringify([save, shop, bank, medals, game.best, game.character, game.sound, game.music]); } catch (e) { return ''; } }
   var lastSig = '';   // first tick writes anything start-up changed (e.g. migrated hero ids); the downgrade guard still applies
   var saveStats = { checks: 0, writes: 0, checkMs: 0, writeMs: 0, maxMs: 0 };   // autosave cost (WebSwingCity.saveStats())
@@ -14266,6 +14336,7 @@
     toggleFly: toggleFly, FLY: FLY, HEARTB: HEARTB, bossSkin: bossSkin, EXTRA_HEROES: EXTRA_HEROES,
     STORIES: STORIES, startGame: startGame,
     r25: { jump: r25Jump, whatsNew: r25WhatsNew, skipped: r25Skipped, cont: r24Continue, finish: function () { finishLevel(); }, save: function () { return save; }, NEW_FROM: R25_NEW_FROM, WORLD10: WORLD10, LION_FINAL: LION_FINAL },   // round 25 (tests)
+    gc: { on: function () { return gc.on; }, wanted: gcWanted, boot: gcBoot, event: gcEvent, send: gcSend, set: setCounts, path: GC_PATH, state: function () { return gc; } },   // round 25b
     unlockedCount: unlockedCount, WORLD3: WORLD3, WORLD4: WORLD4, LEVELS: LEVELS, volc: function () { return game.volc; }, vsLobby: function () { return withUI(vsLayout); }, vsEnd: function () { return withUI(vsEndLayout); }, openVersus: openVersus, mouse: mouse, findAnchor: function () { return findAnchor(); }, cam: cam, view: function () { return { scale: scale, sx0: sx0, sy0: sy0, UI: UI }; },
     voice: VC, announce: announce, speak: speak, fx: fx, audio: function () { return audio; }, teamCarryCheck: teamCarryCheck, setVoices: setVoices, cycleVolume: cycleVolume, crowdCheer: crowdCheer, landThud: landThud, startVersus: startVersus, vsSel: vsSel, VS_MODES: VS_MODES,
     net: netState, netApi: { openMenu: netOpenMenu, host: netHostOpen, join: netJoinOpen, type: netType, go: netJoinGo, leave: netLeave, lobby: netLobby,
